@@ -1,0 +1,55 @@
+name: Build SPECTRA
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'oscillators/spectra/**'
+      - '.github/workflows/build-spectra.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone Korg logue SDK
+        run: |
+          git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Prepare SPECTRA project
+        run: |
+          cp -a logue-sdk/platform/nutekt-digital/dummy-osc logue-sdk/platform/nutekt-digital/spectra
+          cp oscillators/spectra/nts1/manifest.json logue-sdk/platform/nutekt-digital/spectra/manifest.json
+          cp oscillators/spectra/nts1/project.mk logue-sdk/platform/nutekt-digital/spectra/project.mk
+          mkdir -p logue-sdk/platform/nutekt-digital/spectra/src
+          cp oscillators/spectra/nts1/src/spectra.cpp logue-sdk/platform/nutekt-digital/spectra/src/spectra.cpp
+
+      - name: Build SPECTRA
+        run: |
+          cd logue-sdk/platform/nutekt-digital/spectra
+          make GCC_BIN_PATH=/usr/bin
+          make GCC_BIN_PATH=/usr/bin install
+          arm-none-eabi-size build/spectra.elf
+          ls -lh spectra.ntkdigunit
+
+      - name: Stage artifact
+        run: |
+          mkdir -p artifacts
+          cp logue-sdk/platform/nutekt-digital/spectra/spectra.ntkdigunit artifacts/
+          cp logue-sdk/platform/nutekt-digital/spectra/build/spectra.map artifacts/
+          cp logue-sdk/platform/nutekt-digital/spectra/build/spectra.list artifacts/
+
+      - name: Upload SPECTRA build
+        uses: actions/upload-artifact@v4
+        with:
+          name: spectra-nts1
+          path: artifacts/
+          if-no-files-found: error
