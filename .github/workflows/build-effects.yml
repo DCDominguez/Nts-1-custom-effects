@@ -1,0 +1,62 @@
+name: Build NTS-1 Effects
+
+on:
+  push:
+    paths:
+      - 'effects/**'
+      - '.github/workflows/build-effects.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        effect:
+          - name: parallax
+            source: effects/parallax/nts1
+          - name: chordghost
+            source: effects/chordghost/nts1
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Prepare ${{ matrix.effect.name }} project
+        run: |
+          cp -a logue-sdk/platform/nutekt-digital/dummy-delfx logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}
+          cp ${{ matrix.effect.source }}/manifest.json logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/manifest.json
+          cp ${{ matrix.effect.source }}/project.mk logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/project.mk
+          mkdir -p logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/src
+          cp -a ${{ matrix.effect.source }}/src/. logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/src/
+
+      - name: Build ${{ matrix.effect.name }}
+        run: |
+          cd logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}
+          make GCC_BIN_PATH=/usr/bin
+          make GCC_BIN_PATH=/usr/bin install
+          arm-none-eabi-size build/${{ matrix.effect.name }}.elf
+          ls -lh ${{ matrix.effect.name }}.ntkdigunit
+
+      - name: Stage artifact
+        run: |
+          mkdir -p artifacts
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/${{ matrix.effect.name }}.ntkdigunit artifacts/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/build/${{ matrix.effect.name }}.map artifacts/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.effect.name }}/build/${{ matrix.effect.name }}.list artifacts/
+
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.effect.name }}-nts1
+          path: artifacts/
+          if-no-files-found: error
