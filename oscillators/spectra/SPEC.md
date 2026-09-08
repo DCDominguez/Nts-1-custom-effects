@@ -119,17 +119,17 @@ This makes interval movement a performance control instead of a static patch cho
 
 ## 5. Interval constellations
 
-Initial modes:
+The most important additional interval is placed on voice 2 so two-voice operation is already useful:
 
 ```text
-1 UNISON :  0,  0,  0,  0
-2 FIFTH  :  0,  0, +7, +12
-3 OCTAVE : -12, 0, +12, +24
-4 MAJOR  :  0, +4, +7, +12
-5 MINOR  :  0, +3, +7, +12
-6 SUS    :  0, +5, +7, +12
-7 QUARTAL:  0, +5,+10, +15
-8 CLUSTER:  0, +1, +7, +13
+1 UNISON :  0,  0,   0,   0
+2 FIFTH  :  0, +7, +12, -12
+3 OCTAVE :  0,+12, -12, +24
+4 MAJOR  :  0, +7,  +4, +12
+5 MINOR  :  0, +7,  +3, +12
+6 SUS    :  0, +7,  +5, +12
+7 QUARTAL:  0, +5, +10, +15
+8 CLUSTER:  0, +1,  +7, +13
 ```
 
 `ALT` scales these interval distances continuously from zero to the listed values.
@@ -137,29 +137,27 @@ Initial modes:
 Example with MAJOR selected:
 
 ```text
-ALT 0.00: 0, 0,   0,   0
-ALT 0.50: 0,+2, +3.5, +6
-ALT 1.00: 0,+4,  +7, +12
+ALT 0.00: 0,   0, 0,  0
+ALT 0.50: 0,+3.5,+2,+6
+ALT 1.00: 0,  +7,+4,+12
 ```
 
-Frequency ratios should be recalculated when `ALT` or `HarmMode` changes, not inside every sample calculation.
+Frequency ratios are recalculated when `ALT` or `HarmMode` changes, not inside every sample calculation.
 
 ## 6. Detune and drift
 
 ### Static spread
 
-Each voice receives a deterministic spread coefficient:
+Spread coefficients depend on the active voice count so one voice remains exactly centered and multi-voice modes remain symmetrical:
 
 ```text
-V1 -1.00
-V2 -0.33
-V3 +0.33
-V4 +1.00
+1 voice :  0
+2 voices: -1, +1
+3 voices: -1,  0, +1
+4 voices: -1, -0.333, +0.333, +1
 ```
 
 `Spread` scales these toward a maximum of approximately ±20 cents.
-
-This remains predictable and gives the swarm a stable center.
 
 ### Drift
 
@@ -191,7 +189,7 @@ Bounds for v0.1:
 ```text
 extra tuning: roughly ±4 cents max
 level variation: roughly ±12% max
-phase: deterministic anchor → increasingly random
+phase: deterministic zero → increasingly random
 ```
 
 At Chaos = 0, repeated notes should be reproducible.
@@ -207,7 +205,7 @@ The first engine morphs four waveform families:
 3. band-limited saw via SDK lookup
 4. band-limited square via SDK lookup
 
-Band-limit table selection should follow the played pitch and account conservatively for upward interval voices.
+Band-limit table selection follows played pitch plus the active interval contribution.
 
 The output of all active voices is normalized before conversion to Q31. A final light soft-clip stage may catch peaks but must not be used to hide chronic gain errors.
 
