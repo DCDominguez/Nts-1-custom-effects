@@ -8,6 +8,8 @@ The repository treats the NTS-1 as a programmable musical system rather than a c
 
 **All 25 current M1 units compile and have been reported working correctly on the physical original NTS-1 MkI.** The M1 suite is now hardware validated at suite level.
 
+For descriptions, control mappings and practical instructions for every current unit, see the **[Human Soon NTS-1 User Guide](USER_GUIDE.md)**.
+
 See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
 ## Oscillator
