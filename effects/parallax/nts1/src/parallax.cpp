@@ -5,7 +5,10 @@
 namespace {
 
 static const float kSampleRate = 48000.0f;
-static const uint32_t kDelayLineSize = (1u << 13);
+// 32768 samples = ~682.7 ms at the NTS-1 MkI 48 kHz sample rate. M2.1 uses
+// this extra aperture to move PARALLAX beyond chorus territory into clearly
+// separated spatial arrivals while preserving a tight/doubler region.
+static const uint32_t kDelayLineSize = (1u << 15);
 static const uint32_t kDelayLineMask = kDelayLineSize - 1u;
 static const uint32_t kNumVoices = 4u;
 static const float kLn2Over1200 = 0.0005776226504666211f;
@@ -22,11 +25,15 @@ struct VoiceConfig {
   float gain;
 };
 
+// At SPREAD=0 PARALLAX still behaves as a tight spatial doubler. At SPREAD=1
+// the four arrivals become intentionally discrete: ~40 / 160 / 360 / 620 ms.
+// Stereo anchors alternate across the field so time also describes a spatial
+// path rather than four taps collecting near the center.
 static const VoiceConfig kVoices[kNumVoices] = {
-  { 8.0f,  8.0f, 0.17f, 1.2f, -0.75f, 0.03f, 0.36f },
-  {11.0f, 22.0f, 0.23f, 1.7f, -0.20f, 0.29f, 0.34f },
-  {14.0f, 38.0f, 0.11f, 2.1f,  0.25f, 0.57f, 0.34f },
-  {18.0f, 56.0f, 0.31f, 2.6f,  0.78f, 0.81f, 0.32f }
+  {12.0f,  40.0f, 0.10f, 0.45f, -0.95f, 0.03f, 0.36f},
+  {20.0f, 160.0f, 0.13f, 0.55f,  0.50f, 0.29f, 0.34f},
+  {32.0f, 360.0f, 0.08f, 0.70f, -0.50f, 0.57f, 0.31f},
+  {48.0f, 620.0f, 0.16f, 0.90f,  0.95f, 0.81f, 0.29f}
 };
 
 __sdram float s_delay_l[kDelayLineSize];
@@ -85,6 +92,8 @@ static inline float read_frac(float pos, const float *buffer) {
 static inline void pan_gains(float pan, float &left, float &right) {
   if (pan < -1.0f) pan = -1.0f;
   if (pan > 1.0f) pan = 1.0f;
+  // Linear pan is intentional here: discrete spatial arrivals should remain
+  // strongly localised instead of being energy-normalised toward the centre.
   left = 0.5f * (1.0f - pan);
   right = 0.5f * (1.0f + pan);
 }
@@ -95,13 +104,15 @@ static inline float window_sin2(float phase) {
 }
 
 static inline float voice_rate(uint32_t i) {
-  const float common_rate = 0.19f;
-  const float independence = 0.25f + 0.75f * s_divergence;
+  const float common_rate = 0.10f;
+  const float independence = 0.15f + 0.85f * s_divergence;
   return lerp(common_rate, kVoices[i].base_rate_hz, independence);
 }
 
 static inline float voice_pan(uint32_t i) {
-  const float width = 0.35f + 0.65f * s_divergence;
+  // DIVERGENCE now has a much larger stereo range. At minimum the taps are
+  // still slightly separated; at maximum the outer pair approaches hard L/R.
+  const float width = 0.15f + 0.85f * s_divergence;
   return kVoices[i].base_pan * width;
 }
 
@@ -112,7 +123,10 @@ static inline float base_delay_samples(uint32_t i) {
 
 static inline float chorus_delay_samples(uint32_t i) {
   const VoiceConfig &v = kVoices[i];
-  const float motion_scale = 0.12f + 0.88f * s_divergence;
+  // Modulation deliberately recedes as SPREAD opens. This prevents the long
+  // settings from reading mainly as chorus; the listener hears distinct time
+  // and position first, with only slight motion around each arrival.
+  const float motion_scale = (0.08f + 0.42f * s_divergence) * (1.0f - 0.78f * s_spread);
   const float motion_ms = v.max_motion_ms * motion_scale * fx_sinf(s_phase[i]);
   float delay_ms = lerp(v.tight_delay_ms, v.wide_delay_ms, s_spread) + motion_ms;
   if (delay_ms < 2.0f) delay_ms = 2.0f;
@@ -122,8 +136,8 @@ static inline float chorus_delay_samples(uint32_t i) {
 }
 
 static inline float pitch_ratio_a() {
-  // M2 introduces one stable micro-pitch voice. DIVERGENCE scales Voice A
-  // continuously from unison to the intended -9 cent constellation target.
+  // Retain the M2 true micro-pitch voice. DIVERGENCE scales Voice A from
+  // unison to roughly -9 cents while its arrival can now move out to ~40 ms.
   const float cents = kVoiceAMaxCents * s_divergence;
   return 1.0f + cents * kLn2Over1200;
 }
@@ -190,9 +204,8 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     float wet_l = 0.0f;
     float wet_r = 0.0f;
 
-    // Voice A: true dual-head pitch shift. The tiny retained M1 motion keeps
-    // the voice alive without dominating the stable cents offset.
-    const float motion_a = ms_to_samples(kVoices[0].max_motion_ms * 0.20f * s_divergence * fx_sinf(s_phase[0]));
+    const float motion_a_scale = (0.04f + 0.18f * s_divergence) * (1.0f - 0.80f * s_spread);
+    const float motion_a = ms_to_samples(kVoices[0].max_motion_ms * motion_a_scale * fx_sinf(s_phase[0]));
     const float voice_a = pitched_read_mono(base_delay_samples(0) + motion_a);
     float pan_l = 0.5f, pan_r = 0.5f;
     pan_gains(voice_pan(0), pan_l, pan_r);
@@ -200,7 +213,6 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     wet_r += voice_a * pan_r * kVoices[0].gain;
     advance_phase(0);
 
-    // Voices B-D remain the hardware-proven M1 chorus field for this milestone.
     for (uint32_t i = 1u; i < kNumVoices; ++i) {
       const float delay_samples = chorus_delay_samples(i);
       const float read_pos = static_cast<float>(s_write_index) - delay_samples;
