@@ -37,8 +37,9 @@ static inline float clamp01(float x) {
 }
 
 static inline float clamp_audio(float x) {
-  const float ax = x < 0.0f ? -x : x;
-  return x / (1.0f + 0.32f * ax);
+  if (x < -1.0f) return -1.0f;
+  if (x > 1.0f) return 1.0f;
+  return x;
 }
 
 static inline float wrap01(float x) {
@@ -98,21 +99,21 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     s_pre_l[s_pre_write] = in_l;
     s_pre_r[s_pre_write] = in_r;
 
-    const float pre_scale = 0.72f + 0.72f * s_space;
-    const float e0 = 0.5f * (read_pre(s_pre_l, 839.0f * pre_scale) + read_pre(s_pre_r, 977.0f * pre_scale));
-    const float e1 = 0.5f * (read_pre(s_pre_l, 1289.0f * pre_scale) + read_pre(s_pre_r, 1451.0f * pre_scale));
-    const float e2 = 0.5f * (read_pre(s_pre_l, 1907.0f * pre_scale) + read_pre(s_pre_r, 2137.0f * pre_scale));
-    const float e3 = 0.5f * (read_pre(s_pre_l, 2711.0f * pre_scale) + read_pre(s_pre_r, 3011.0f * pre_scale));
+    const float pre_scale = 0.66f + 0.86f * s_space;
+    const float e0 = 0.5f * (read_pre(s_pre_l, 733.0f * pre_scale) + read_pre(s_pre_r, 911.0f * pre_scale));
+    const float e1 = 0.5f * (read_pre(s_pre_l, 1187.0f * pre_scale) + read_pre(s_pre_r, 1423.0f * pre_scale));
+    const float e2 = 0.5f * (read_pre(s_pre_l, 1811.0f * pre_scale) + read_pre(s_pre_r, 2113.0f * pre_scale));
+    const float e3 = 0.5f * (read_pre(s_pre_l, 2609.0f * pre_scale) + read_pre(s_pre_r, 3049.0f * pre_scale));
 
-    s_phase = wrap01(s_phase + (0.021f + 0.055f * s_coalesce) / kSampleRate);
-    const float mod = 8.0f + 18.0f * s_coalesce;
-    const float room = 0.84f + 0.38f * s_space;
+    s_phase = wrap01(s_phase + (0.018f + 0.070f * s_coalesce) / kSampleRate);
+    const float mod = 7.0f + 25.0f * s_coalesce;
+    const float room = 0.80f + 0.42f * s_space;
     const float r0 = read_fdn(s_fdn0, 2953.0f * room + mod * fx_sinf(s_phase));
     const float r1 = read_fdn(s_fdn1, 3821.0f * room + mod * fx_sinf(s_phase + 0.23f));
     const float r2 = read_fdn(s_fdn2, 4999.0f * room + mod * fx_sinf(s_phase + 0.51f));
     const float r3 = read_fdn(s_fdn3, 6421.0f * room + mod * fx_sinf(s_phase + 0.77f));
 
-    const float damping = 0.34f - 0.16f * s_coalesce;
+    const float damping = 0.30f - 0.12f * s_coalesce;
     s_lp0 += (r0 - s_lp0) * damping;
     s_lp1 += (r1 - s_lp1) * damping;
     s_lp2 += (r2 - s_lp2) * damping;
@@ -124,25 +125,32 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float h3 = 0.5f * (s_lp0 - s_lp1 - s_lp2 + s_lp3);
 
     const float early = 0.25f * (e0 + e1 + e2 + e3);
-    const float inject_dense = mid * (0.14f + 0.26f * s_coalesce) + early * (0.12f + 0.40f * s_coalesce);
-    const float inject_side = side * (0.10f + 0.16f * s_coalesce);
-    const float feedback = 0.50f + 0.40f * s_space + 0.045f * s_coalesce;
+
+    // 0.1-1: stronger injection and feedback so the generated phrase actually
+    // blooms. Low COALESCE keeps early fragments; high COALESCE leans hard into
+    // the FDN until those fragments become one harmonic field.
+    const float inject_dense = mid * (0.24f + 0.34f * s_coalesce) + early * (0.22f + 0.52f * s_coalesce);
+    const float inject_side = side * (0.16f + 0.22f * s_coalesce);
+    const float feedback = 0.58f + 0.30f * s_space + 0.075f * s_coalesce;
 
     s_fdn0[s_fdn_write] = clamp_audio(inject_dense + h0 * feedback);
     s_fdn1[s_fdn_write] = clamp_audio(inject_side + h1 * feedback);
     s_fdn2[s_fdn_write] = clamp_audio(inject_dense + h2 * feedback);
     s_fdn3[s_fdn_write] = clamp_audio(-inject_side + h3 * feedback);
 
-    const float sparse_l = 0.58f * e0 + 0.28f * e2;
-    const float sparse_r = 0.58f * e1 + 0.28f * e3;
-    const float dense_l = 0.43f * (r0 + r2) + 0.12f * (r1 - r3);
-    const float dense_r = 0.43f * (r1 + r3) + 0.12f * (r2 - r0);
+    const float sparse_l = 0.70f * e0 + 0.42f * e2;
+    const float sparse_r = 0.70f * e1 + 0.42f * e3;
+    const float dense_l = 0.55f * (r0 + r2) + 0.17f * (r1 - r3);
+    const float dense_r = 0.55f * (r1 + r3) + 0.17f * (r2 - r0);
     const float wet_l = sparse_l * (1.0f - s_coalesce) + dense_l * s_coalesce;
     const float wet_r = sparse_r * (1.0f - s_coalesce) + dense_r * s_coalesce;
 
-    const float wet_gain = 0.68f;
-    xn[f * 2u] = clamp_audio(in_l * (1.0f - s_mix) + wet_l * s_mix * wet_gain);
-    xn[f * 2u + 1u] = clamp_audio(in_r * (1.0f - s_mix) + wet_r * s_mix * wet_gain);
+    // The previous equal crossfade reduced the whole chain as MIX rose. Keep a
+    // strong dry spine and add the cloud in parallel instead.
+    const float dry_gain = 1.0f - 0.30f * s_mix;
+    const float wet_gain = 0.60f + 0.95f * s_mix;
+    xn[f * 2u] = clamp_audio(in_l * dry_gain + wet_l * wet_gain * s_mix);
+    xn[f * 2u + 1u] = clamp_audio(in_r * dry_gain + wet_r * wet_gain * s_mix);
 
     s_pre_write = (s_pre_write + 1u) & kPreMask;
     s_fdn_write = (s_fdn_write + 1u) & kFdnMask;
