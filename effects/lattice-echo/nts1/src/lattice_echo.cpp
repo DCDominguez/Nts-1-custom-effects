@@ -5,42 +5,65 @@
 namespace {
 
 static const float kSampleRate = 48000.0f;
-static const uint32_t kBufferSize = 65536u;
-static const uint32_t kBufferMask = kBufferSize - 1u;
-static const uint32_t kTapCount = 12u;
+static const uint32_t kFragmentSlots = 4u;
+static const uint32_t kFragmentSize = 4096u;
+static const uint32_t kPlaybackVoices = 24u;
 static const float kParamSlew = 0.0015f;
 
-__sdram float s_delay_l[kBufferSize];
-__sdram float s_delay_r[kBufferSize];
+// ECHO 0.2 is an event/playback engine rather than a continuously moving
+// multi-tap delay. Four short captured fragments are clocked through a pool of
+// playback voices. Moving CLOCK or MODE only affects future events, so turning
+// the knobs cannot drag live delay heads through memory.
+__sdram float s_fragment[kFragmentSlots][kFragmentSize];
 
-static uint32_t s_write = 0u;
-static uint32_t s_event = 0u;
-static uint32_t s_capture_remaining = 0u;
+struct FragmentSlot {
+  uint32_t length;
+  uint32_t generations_left;
+  bool valid;
+};
+
+struct PlaybackVoice {
+  uint32_t slot;
+  uint32_t remaining;
+  uint32_t delay_remaining;
+  float position;
+  float increment;
+  float gain_l;
+  float gain_r;
+  float level;
+  bool active;
+};
+
+static FragmentSlot s_slot[kFragmentSlots];
+static PlaybackVoice s_voice[kPlaybackVoices];
+
+static uint32_t s_capture_slot = 0u;
+static uint32_t s_capture_pos = 0u;
+static uint32_t s_capture_target = 2048u;
+static uint32_t s_last_completed_slot = 0u;
+static uint32_t s_tick_remaining = 1u;
+static uint32_t s_tick_samples = 12000u;
+static uint32_t s_tick_counter = 0u;
 static uint32_t s_refractory = 0u;
-static bool s_capture_this_event = false;
-static bool s_flip = false;
+static uint32_t s_since_capture = 0u;
+static bool s_capturing = false;
 
 static float s_fast_env = 0.0f;
 static float s_slow_env = 0.0f;
-static float s_fb_lp_l = 0.0f;
-static float s_fb_lp_r = 0.0f;
+static float s_wet_lp_l = 0.0f;
+static float s_wet_lp_r = 0.0f;
 
-static float s_distance_target = 0.42f;
-static float s_pick_target = 0.45f;
-static float s_mix_target = 0.35f;
-static float s_distance = 0.42f;
-static float s_pick = 0.45f;
-static float s_mix = 0.35f;
+static float s_clock_target = 0.50f;
+static float s_mode_target = 0.10f;
+static float s_mix_target = 0.40f;
+static float s_clock = 0.50f;
+static float s_mode = 0.10f;
+static float s_mix = 0.40f;
 
-static const float kTapRatio[kTapCount] = {
-  0.18f, 0.235f, 0.305f, 0.385f, 0.47f, 0.56f,
-  0.655f, 0.75f, 0.83f, 0.895f, 0.95f, 1.0f
-};
+static uint32_t s_clock_latched = 4u;
+static uint32_t s_mode_latched = 0u;
 
-static const float kTapWeight[kTapCount] = {
-  0.34f, 0.31f, 0.29f, 0.27f, 0.25f, 0.23f,
-  0.22f, 0.20f, 0.19f, 0.18f, 0.17f, 0.16f
-};
+static inline float absf(float x) { return x < 0.0f ? -x : x; }
 
 static inline float clamp01(float x) {
   if (x < 0.0f) return 0.0f;
@@ -48,60 +71,205 @@ static inline float clamp01(float x) {
   return x;
 }
 
-static inline float clamp_audio(float x) {
-  if (x < -1.0f) return -1.0f;
-  if (x > 1.0f) return 1.0f;
-  return x;
+static inline float soft_limit(float x) {
+  const float ax = absf(x);
+  if (ax <= 0.88f) return x;
+  float y = 0.88f + (ax - 0.88f) / (1.0f + 3.5f * (ax - 0.88f));
+  if (y > 0.995f) y = 0.995f;
+  return x < 0.0f ? -y : y;
 }
 
-static inline float absf(float x) { return x < 0.0f ? -x : x; }
-
-static inline float read_frac(const float *buffer, float delay_samples) {
-  float pos = static_cast<float>(s_write) - delay_samples;
-  while (pos < 0.0f) pos += static_cast<float>(kBufferSize);
-  const uint32_t i0 = static_cast<uint32_t>(pos) & kBufferMask;
-  const uint32_t i1 = (i0 + 1u) & kBufferMask;
-  const float frac = pos - static_cast<float>(static_cast<uint32_t>(pos));
-  return buffer[i0] + (buffer[i1] - buffer[i0]) * frac;
+static inline uint32_t clock_index(float value) {
+  uint32_t i = static_cast<uint32_t>(value * 7.999f);
+  if (i > 7u) i = 7u;
+  return i;
 }
 
-static inline uint32_t pick_index(float p) {
-  uint32_t idx = static_cast<uint32_t>(p * 7.999f);
-  if (idx > 7u) idx = 7u;
-  return idx;
+static inline uint32_t mode_index(float value) {
+  uint32_t i = static_cast<uint32_t>(value * 3.999f);
+  if (i > 3u) i = 3u;
+  return i;
 }
 
-static inline bool selected_event(uint32_t mode, uint32_t event) {
-  switch (mode) {
-    case 0u: return (event % 8u) == 0u;
-    case 1u: return (event % 5u) == 0u;
-    case 2u: return (event % 4u) == 0u;
-    case 3u: return (event % 3u) == 0u;
-    case 4u: return (event % 2u) == 0u;
-    case 5u: { const uint32_t r = event % 5u; return r == 2u || r == 0u; }
-    case 6u: { const uint32_t r = event & 7u; return r == 1u || r == 2u || r == 5u; }
-    default: return true;
+static inline float division_beats(uint32_t i) {
+  // Quarter-note beat units:
+  // 1/32, 1/16T, 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2.
+  static const float kBeats[8] = {
+    0.125f, 0.16666667f, 0.25f, 0.33333333f,
+    0.50f, 0.66666667f, 1.0f, 2.0f
+  };
+  return kBeats[i & 7u];
+}
+
+static inline uint32_t samples_for_clock(uint32_t division) {
+  float bpm = fx_get_bpmf();
+  if (bpm < 30.0f || bpm > 300.0f) bpm = 120.0f;
+  const float samples = (60.0f * kSampleRate / bpm) * division_beats(division);
+  if (samples < 96.0f) return 96u;
+  if (samples > 192000.0f) return 192000u;
+  return static_cast<uint32_t>(samples);
+}
+
+static inline uint32_t capture_length_for_tick(uint32_t tick) {
+  uint32_t n = tick / 3u;
+  if (n < 768u) n = 768u;
+  if (n > kFragmentSize) n = kFragmentSize;
+  return n;
+}
+
+static void begin_capture(void) {
+  s_capture_slot = (s_last_completed_slot + 1u) & (kFragmentSlots - 1u);
+  s_capture_pos = 0u;
+  s_capture_target = capture_length_for_tick(s_tick_samples);
+  s_capturing = true;
+  s_since_capture = 0u;
+  s_slot[s_capture_slot].valid = false;
+  s_slot[s_capture_slot].length = 0u;
+  s_slot[s_capture_slot].generations_left = 0u;
+}
+
+static void finish_capture(void) {
+  FragmentSlot &slot = s_slot[s_capture_slot];
+  slot.length = s_capture_pos;
+  if (slot.length < 64u) slot.length = 64u;
+  if (slot.length > kFragmentSize) slot.length = kFragmentSize;
+  slot.generations_left = 12u;
+  slot.valid = true;
+  s_last_completed_slot = s_capture_slot;
+  s_capturing = false;
+  s_refractory = static_cast<uint32_t>(kSampleRate * 0.10f);
+}
+
+static PlaybackVoice *free_voice(void) {
+  for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
+    if (!s_voice[i].active) return &s_voice[i];
+  }
+  // If the cloud is completely full, recycle the quietest/oldest tail slot
+  // deterministically rather than failing or growing an unstable feedback sum.
+  return &s_voice[s_tick_counter % kPlaybackVoices];
+}
+
+static void spawn_voice(uint32_t slot_index, bool reverse,
+                        uint32_t delay_samples, float pan, float level,
+                        uint32_t length_override) {
+  FragmentSlot &slot = s_slot[slot_index];
+  if (!slot.valid || slot.length < 64u) return;
+
+  PlaybackVoice *v = free_voice();
+  uint32_t length = length_override;
+  if (length == 0u || length > slot.length) length = slot.length;
+  if (length < 32u) length = 32u;
+
+  v->slot = slot_index;
+  v->remaining = length;
+  v->delay_remaining = delay_samples;
+  v->increment = reverse ? -1.0f : 1.0f;
+  v->position = reverse ? static_cast<float>(length - 1u) : 0.0f;
+  if (pan < -1.0f) pan = -1.0f;
+  if (pan > 1.0f) pan = 1.0f;
+  v->gain_l = 0.5f * (1.0f - pan);
+  v->gain_r = 0.5f * (1.0f + pan);
+  v->level = level;
+  v->active = true;
+}
+
+static void schedule_regular_tick(uint32_t mode) {
+  static const float kOffset[4] = { 0.0f, 0.21f, 0.48f, 0.73f };
+  static const float kLevel[4]  = { 0.72f, 0.53f, 0.39f, 0.29f };
+  static const float kPan[4]    = { -0.72f, 0.64f, -0.34f, 0.86f };
+
+  const bool reverse = (mode == 1u);
+  const bool pingpong = (mode == 2u);
+
+  for (uint32_t age = 0u; age < kFragmentSlots; ++age) {
+    const uint32_t slot_index = (s_last_completed_slot + kFragmentSlots - age) & (kFragmentSlots - 1u);
+    FragmentSlot &slot = s_slot[slot_index];
+    if (!slot.valid || slot.generations_left == 0u) continue;
+
+    float pan = kPan[age];
+    if (pingpong) {
+      const bool right = ((s_tick_counter + age) & 1u) != 0u;
+      pan = right ? (0.58f + 0.10f * static_cast<float>(age))
+                  : (-0.58f - 0.10f * static_cast<float>(age));
+    }
+
+    spawn_voice(slot_index, reverse,
+                static_cast<uint32_t>(static_cast<float>(s_tick_samples) * kOffset[age]),
+                pan, kLevel[age], 0u);
+
+    --slot.generations_left;
+    if (slot.generations_left == 0u) slot.valid = false;
   }
 }
 
-static inline float distance_samples(float distance) {
-  const float seconds = 0.18f + 0.92f * distance * distance;
-  return seconds * kSampleRate;
+static void schedule_stutter_tick(void) {
+  FragmentSlot &slot = s_slot[s_last_completed_slot];
+  if (!slot.valid || slot.generations_left == 0u) return;
+
+  uint32_t slice = s_tick_samples / 8u;
+  if (slice < 192u) slice = 192u;
+  if (slice > 1536u) slice = 1536u;
+  if (slice > slot.length) slice = slot.length;
+
+  for (uint32_t i = 0u; i < 6u; ++i) {
+    const uint32_t offset = (s_tick_samples * i) / 6u;
+    const float pan = (i & 1u) ? 0.55f : -0.55f;
+    const float level = 0.62f - 0.055f * static_cast<float>(i);
+    spawn_voice(s_last_completed_slot, false, offset, pan, level, slice);
+  }
+
+  --slot.generations_left;
+  if (slot.generations_left == 0u) slot.valid = false;
+}
+
+static void schedule_tick(void) {
+  s_clock_latched = clock_index(s_clock);
+  s_mode_latched = mode_index(s_mode);
+  s_tick_samples = samples_for_clock(s_clock_latched);
+
+  if (s_mode_latched == 3u) schedule_stutter_tick();
+  else schedule_regular_tick(s_mode_latched);
+
+  ++s_tick_counter;
 }
 
 static void reset_state(void) {
-  for (uint32_t i = 0u; i < kBufferSize; ++i) s_delay_l[i] = s_delay_r[i] = 0.0f;
-  s_write = 0u;
-  s_event = 0u;
-  s_capture_remaining = 0u;
+  for (uint32_t s = 0u; s < kFragmentSlots; ++s) {
+    for (uint32_t i = 0u; i < kFragmentSize; ++i) s_fragment[s][i] = 0.0f;
+    s_slot[s].length = 0u;
+    s_slot[s].generations_left = 0u;
+    s_slot[s].valid = false;
+  }
+  for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
+    s_voice[i].slot = 0u;
+    s_voice[i].remaining = 0u;
+    s_voice[i].delay_remaining = 0u;
+    s_voice[i].position = 0.0f;
+    s_voice[i].increment = 1.0f;
+    s_voice[i].gain_l = 0.5f;
+    s_voice[i].gain_r = 0.5f;
+    s_voice[i].level = 0.0f;
+    s_voice[i].active = false;
+  }
+
+  s_capture_slot = 0u;
+  s_capture_pos = 0u;
+  s_capture_target = 2048u;
+  s_last_completed_slot = 0u;
+  s_tick_remaining = 1u;
+  s_tick_samples = 12000u;
+  s_tick_counter = 0u;
   s_refractory = 0u;
-  s_capture_this_event = false;
-  s_flip = false;
+  s_since_capture = 0u;
+  s_capturing = false;
   s_fast_env = s_slow_env = 0.0f;
-  s_fb_lp_l = s_fb_lp_r = 0.0f;
-  s_distance_target = s_distance = 0.42f;
-  s_pick_target = s_pick = 0.45f;
-  s_mix_target = s_mix = 0.35f;
+  s_wet_lp_l = s_wet_lp_r = 0.0f;
+
+  s_clock_target = s_clock = 0.50f;
+  s_mode_target = s_mode = 0.10f;
+  s_mix_target = s_mix = 0.40f;
+  s_clock_latched = 4u;
+  s_mode_latched = 0u;
 }
 
 } // namespace
@@ -114,75 +282,84 @@ void DELFX_INIT(uint32_t platform, uint32_t api) {
 
 void DELFX_PROCESS(float *xn, uint32_t frames) {
   for (uint32_t f = 0u; f < frames; ++f) {
-    s_distance += (s_distance_target - s_distance) * kParamSlew;
-    s_pick += (s_pick_target - s_pick) * kParamSlew;
+    s_clock += (s_clock_target - s_clock) * kParamSlew;
+    s_mode += (s_mode_target - s_mode) * kParamSlew;
     s_mix += (s_mix_target - s_mix) * kParamSlew;
 
     const float in_l = xn[f * 2u];
     const float in_r = xn[f * 2u + 1u];
-    const float mid_abs = absf(0.5f * (in_l + in_r));
+    const float mono = 0.5f * (in_l + in_r);
+    const float level = absf(mono);
 
-    s_fast_env += (mid_abs - s_fast_env) * 0.055f;
-    s_slow_env += (mid_abs - s_slow_env) * 0.0014f;
+    s_fast_env += (level - s_fast_env) * 0.050f;
+    s_slow_env += (level - s_slow_env) * 0.0012f;
     if (s_refractory > 0u) --s_refractory;
+    ++s_since_capture;
 
-    const bool onset = (s_refractory == 0u) &&
-                       (s_fast_env > s_slow_env * 1.55f + 0.007f) &&
-                       (s_fast_env > 0.012f);
-    if (onset) {
-      ++s_event;
-      s_capture_this_event = selected_event(pick_index(s_pick), s_event);
-      s_capture_remaining = static_cast<uint32_t>(kSampleRate * (0.052f + 0.085f * s_distance));
-      s_refractory = static_cast<uint32_t>(kSampleRate * 0.024f);
-      s_flip = !s_flip;
+    const bool onset = !s_capturing && s_refractory == 0u &&
+                       s_fast_env > (s_slow_env * 1.50f + 0.006f) &&
+                       s_fast_env > 0.010f;
+    const bool fallback_capture = !s_capturing && s_refractory == 0u &&
+                                  s_since_capture > static_cast<uint32_t>(kSampleRate * 0.70f) &&
+                                  s_fast_env > 0.012f;
+    if (onset || fallback_capture) begin_capture();
+
+    if (s_capturing) {
+      s_fragment[s_capture_slot][s_capture_pos] = mono;
+      ++s_capture_pos;
+      if (s_capture_pos >= s_capture_target || s_capture_pos >= kFragmentSize) finish_capture();
     }
 
-    const float base = distance_samples(s_distance);
-    float cloud_l = 0.0f;
-    float cloud_r = 0.0f;
+    if (s_tick_remaining == 0u) {
+      schedule_tick();
+      s_tick_remaining = s_tick_samples;
+    }
+    if (s_tick_remaining > 0u) --s_tick_remaining;
 
-    // 0.1-1: selected material now fans out into twelve discrete arrivals.
-    // Alternating source/channel emphasis keeps the field wide without an LFO.
-    for (uint32_t t = 0u; t < kTapCount; ++t) {
-      const float dly_l = base * kTapRatio[t] + static_cast<float>((t * 17u) & 63u);
-      const float dly_r = base * kTapRatio[t] * (1.006f + 0.0015f * static_cast<float>(t)) + static_cast<float>((t * 29u) & 79u);
-      const float a = read_frac(s_delay_l, dly_l);
-      const float b = read_frac(s_delay_r, dly_r);
-      const float w = kTapWeight[t];
-      if ((t & 1u) == 0u) {
-        cloud_l += a * w;
-        cloud_r += b * w * 0.72f;
-      } else {
-        cloud_l += b * w * 0.72f;
-        cloud_r += a * w;
+    float wet_l = 0.0f;
+    float wet_r = 0.0f;
+
+    for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
+      PlaybackVoice &v = s_voice[i];
+      if (!v.active) continue;
+      if (v.delay_remaining > 0u) {
+        --v.delay_remaining;
+        continue;
       }
+
+      const FragmentSlot &slot = s_slot[v.slot];
+      if (slot.length < 32u || v.remaining == 0u) {
+        v.active = false;
+        continue;
+      }
+
+      int32_t index = static_cast<int32_t>(v.position);
+      if (index < 0) index = 0;
+      if (index >= static_cast<int32_t>(slot.length)) index = static_cast<int32_t>(slot.length - 1u);
+      const float sample = s_fragment[v.slot][static_cast<uint32_t>(index)];
+
+      // A simple triangular edge window keeps each scheduled fragment clean.
+      const uint32_t played = slot.length > v.remaining ? (slot.length - v.remaining) : 0u;
+      float env = 1.0f;
+      if (played < 64u) env = static_cast<float>(played) * (1.0f / 64.0f);
+      if (v.remaining < 64u) env *= static_cast<float>(v.remaining) * (1.0f / 64.0f);
+
+      wet_l += sample * env * v.level * v.gain_l;
+      wet_r += sample * env * v.level * v.gain_r;
+
+      v.position += v.increment;
+      --v.remaining;
+      if (v.remaining == 0u) v.active = false;
     }
 
-    s_fb_lp_l += (cloud_l - s_fb_lp_l) * 0.22f;
-    s_fb_lp_r += (cloud_r - s_fb_lp_r) * 0.22f;
-    const float feedback = 0.46f + 0.23f * s_distance;
+    // Fixed gentle darkening keeps repeated fragments from becoming brittle.
+    s_wet_lp_l += (wet_l - s_wet_lp_l) * 0.34f;
+    s_wet_lp_r += (wet_r - s_wet_lp_r) * 0.34f;
 
-    float inject_l = 0.0f;
-    float inject_r = 0.0f;
-    if (s_capture_this_event && s_capture_remaining > 0u) {
-      const float focus_l = s_flip ? 0.95f : 0.58f;
-      const float focus_r = s_flip ? 0.58f : 0.95f;
-      inject_l = in_l * focus_l;
-      inject_r = in_r * focus_r;
-      --s_capture_remaining;
-      if (s_capture_remaining == 0u) s_capture_this_event = false;
-    }
-
-    s_delay_l[s_write] = clamp_audio(inject_l + (s_fb_lp_l * 0.84f + s_fb_lp_r * 0.16f) * feedback);
-    s_delay_r[s_write] = clamp_audio(inject_r + (s_fb_lp_r * 0.84f + s_fb_lp_l * 0.16f) * feedback);
-
-    // Preserve enough direct signal that turning MIX up feels bigger, not smaller.
-    const float dry_gain = 1.0f - 0.42f * s_mix;
-    const float wet_gain = 0.42f + 0.90f * s_mix;
-    xn[f * 2u] = clamp_audio(in_l * dry_gain + cloud_l * wet_gain * s_mix);
-    xn[f * 2u + 1u] = clamp_audio(in_r * dry_gain + cloud_r * wet_gain * s_mix);
-
-    s_write = (s_write + 1u) & kBufferMask;
+    const float dry_gain = 1.0f - 0.18f * s_mix;
+    const float wet_gain = (0.38f + 0.72f * s_mix) * s_mix;
+    xn[f * 2u] = soft_limit(in_l * dry_gain + s_wet_lp_l * wet_gain);
+    xn[f * 2u + 1u] = soft_limit(in_r * dry_gain + s_wet_lp_r * wet_gain);
   }
 }
 
@@ -191,7 +368,7 @@ void DELFX_RESUME(void) { reset_state(); }
 
 void DELFX_PARAM(uint8_t index, int32_t value) {
   const float normalized = clamp01(q31_to_f32(value));
-  if (index == k_user_delfx_param_time) s_distance_target = normalized;
-  else if (index == k_user_delfx_param_depth) s_pick_target = normalized;
+  if (index == k_user_delfx_param_time) s_clock_target = normalized;
+  else if (index == k_user_delfx_param_depth) s_mode_target = normalized;
   else if (index == k_user_delfx_param_shift_depth) s_mix_target = normalized;
 }
