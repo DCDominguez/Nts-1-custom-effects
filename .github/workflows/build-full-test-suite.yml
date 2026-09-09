@@ -1,0 +1,102 @@
+name: Build Full NTS-1 Test Suite
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-full-test-suite.yml'
+
+jobs:
+  build-full-suite:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone current Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Build all current M1 units
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p suite/binaries suite/qa
+
+          printf '# Human Soon NTS-1 Build Matrix\n\n' > suite/BUILD_MATRIX.md
+          printf 'Built against the Korg logue SDK cloned at CI runtime. Compilation is not physical hardware validation.\n\n' >> suite/BUILD_MATRIX.md
+          printf '| Project | Module | text | data | bss | total |\n|---|---|---:|---:|---:|---:|\n' >> suite/BUILD_MATRIX.md
+
+          build_one() {
+            local name="$1"
+            local source="$2"
+            local module="$3"
+            local template="$4"
+            local target="logue-sdk/platform/nutekt-digital/${name}"
+
+            cp -a "logue-sdk/platform/nutekt-digital/${template}" "$target"
+            cp "${source}/manifest.json" "$target/manifest.json"
+            cp "${source}/project.mk" "$target/project.mk"
+            mkdir -p "$target/src"
+            cp -a "${source}/src/." "$target/src/"
+
+            (
+              cd "$target"
+              make GCC_BIN_PATH=/usr/bin
+              make GCC_BIN_PATH=/usr/bin install
+            )
+
+            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${name}.elf" | tail -n 1)"
+            printf '| %s | `%s` | %s | %s | %s | %s |\n' "$name" "$module" "$text" "$data" "$bss" "$dec" >> suite/BUILD_MATRIX.md
+            cp "$target/${name}.ntkdigunit" suite/binaries/
+
+            local root
+            if [[ "$source" == */nts1 ]]; then root="${source%/nts1}"; else root="$source"; fi
+            if [[ -f "$root/docs/qa-sheet.md" ]]; then
+              cp "$root/docs/qa-sheet.md" "suite/qa/${name}-qa-sheet.md"
+            fi
+          }
+
+          build_one spectra oscillators/spectra/nts1 osc dummy-osc
+          build_one parallax effects/parallax/nts1 delfx dummy-delfx
+          build_one chordghost effects/chordghost/nts1 delfx dummy-delfx
+
+          build_one dust effects/dust/nts1 modfx dummy-modfx
+          build_one carrier effects/carrier/nts1 modfx dummy-modfx
+          build_one vectorfilter effects/vectorfilter/nts1 modfx dummy-modfx
+          build_one ironrot effects/ironrot/nts1 modfx dummy-modfx
+          build_one attractor effects/attractor/nts1 modfx dummy-modfx
+          build_one zerocross effects/zerocross/nts1 modfx dummy-modfx
+          build_one phasewell effects/phasewell/nts1 modfx dummy-modfx
+          build_one ascender effects/ascender/nts1 modfx dummy-modfx
+          build_one helix effects/helix/nts1 modfx dummy-modfx
+          build_one capstan effects/capstan/nts1 modfx dummy-modfx
+          build_one sideband effects/sideband/nts1 modfx dummy-modfx
+          build_one faultline effects/faultline/nts1 modfx dummy-modfx
+
+          build_one ballistic effects/ballistic/nts1 delfx dummy-delfx
+          build_one rainfall effects/rainfall/nts1 delfx dummy-delfx
+          build_one swarmdelay effects/swarmdelay/nts1 delfx dummy-delfx
+          build_one glitchrepeat effects/glitchrepeat/nts1 delfx dummy-delfx
+          build_one bucketline effects/bucketline/nts1 delfx dummy-delfx
+          build_one longmemory effects/longmemory/nts1 delfx dummy-delfx
+          build_one shard effects/shard/nts1 delfx dummy-delfx
+
+          build_one abyss effects/abyss/nts1 revfx dummy-revfx
+          build_one aureole effects/aureole/nts1 revfx dummy-revfx
+          build_one nebula effects/nebula/nts1 revfx dummy-revfx
+
+          cp TESTING.md suite/TESTING.md
+          printf '\nSource commit: `%s`\n' "$GITHUB_SHA" >> suite/BUILD_MATRIX.md
+          printf '\nUse the project QA sheet before marking any binary hardware validated.\n' >> suite/BUILD_MATRIX.md
+
+      - name: Upload complete test suite
+        uses: actions/upload-artifact@v4
+        with:
+          name: human-soon-nts1-test-suite
+          path: suite/
+          if-no-files-found: error
