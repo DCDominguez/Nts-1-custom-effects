@@ -2,145 +2,97 @@
 
 Custom DSP experiments for the **Korg Nu:Tekt NTS-1 digital kit (MkI)** using Korg's logue SDK.
 
-The goal is not to recreate conventional pedals or stock synth voices. These projects treat the NTS-1 as a programmable musical system: oscillators and effects that understand pitch relationships, motion, timing, harmony, or controlled instability.
+The repository treats the NTS-1 as a programmable musical system rather than a collection of conventional pedal clones. Current projects explore harmony, spatial decorrelation, controlled instability, nonlinear timing, stochastic motion, granular processing and feedback networks.
 
-## Oscillators
+## Current status
 
-### SPECTRA
+**25 current units have an M1 build path and hardware QA sheet.** Compilation is not physical validation: every unit remains **READY FOR TEST** until its project QA passes on the original NTS-1 MkI.
 
-**Status:** compiled / ready for physical MkI QA
+See [`TESTING.md`](TESTING.md) for the complete hardware queue and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
-A four-voice swarm oscillator. One incoming pitch becomes an internal ensemble with waveform morphing, detune spread, interval constellations, independent low-rate drift, and bounded per-note mutation.
+## Oscillator
 
-```text
-host pitch
-   |
-   +-- voice 1: root / detune / drift
-   +-- voice 2: interval / detune / drift
-   +-- voice 3: interval / detune / drift
-   +-- voice 4: interval / detune / drift
-             |
-          mono sum
-             |
-       NTS-1 voice path
-```
+- **SPECTRA** (`osc`) — four-voice swarm oscillator with waveform morphing, detune/interval constellations, independent drift and bounded per-note mutation.
 
-The original NTS-1 user-oscillator API outputs one sample per frame, so SPECTRA is intentionally mono before the host filter/envelope/effects. Independent stereo placement is delegated downstream.
+The MkI oscillator API outputs one sample per frame, so SPECTRA is intentionally mono before the NTS-1 host filter/envelope/effects.
 
-See [`oscillators/spectra/SPEC.md`](oscillators/spectra/SPEC.md).
+## Core experimental effects
 
-## Effects
+- **PARALLAX** (`delfx`) — four-voice decorrelated spatial chorus/doubler field. Fixed true pitch-shift voices remain a later milestone.
+- **CHORDGHOST** (`delfx`) — harmonic-delay architecture; M1 is the BPM-synced delay foundation and feature development remains paused until QA.
 
-### PARALLAX
+## Human Soon ModFX
 
-**Status:** compiled M1 / ready for physical MkI QA
+| Unit | Controls / role |
+|---|---|
+| **DUST** | TIME=RATE; DEPTH=DAMAGE — sample-rate/bit reduction + stereo fracture |
+| **CARRIER** | TIME=FREQUENCY; DEPTH=POLARITY — dry→AM→ring + stereo phase split |
+| **VECTORFILTER** | TIME=CUTOFF; DEPTH=VECTOR — LP→BP→HP morph |
+| **IRONROT** | TIME=CHARACTER; DEPTH=CORROSION — bounded tone-dependent distortion |
+| **ATTRACTOR** | TIME=RATE; DEPTH=ORBIT — deterministic chaotic stereo motion |
+| **ZEROCROSS** | TIME=RATE; DEPTH=SWEEP — through-zero flanger architecture |
+| **PHASEWELL** | TIME=RATE; DEPTH=DEPTH/RESONANCE — six-stage asymmetric phaser |
+| **ASCENDER** | TIME=CLIMB; DEPTH=HEIGHT — barber-pole phaser |
+| **HELIX** | TIME=ROTATION; DEPTH=HELIX — barber-pole flanger |
+| **CAPSTAN** | TIME=MOTION; DEPTH=WEAR — wow/flutter/dropout tape motion |
+| **SIDEBAND** | TIME=SHIFT; DEPTH=DIVERGENCE — quadrature frequency shifter |
+| **FAULTLINE** | TIME=CUTOFF; DEPTH=FAULT — bounded unstable nonlinear filter |
 
-A four-voice spatial chorus / swarm doubler. Each wet voice can occupy a different time, pitch, modulation trajectory, and stereo position.
+## Human Soon DelFX
 
-M1 implements four decorrelated modulated delay taps with independent stereo anchors. True fixed pitch offsets are intentionally deferred until the spatial field is proven on hardware.
+All custom delay effects use `SHIFT+DEPTH` / `k_user_delfx_param_shift_depth` for **MIX** in the current M1 designs.
 
-See [`effects/parallax/SPEC.md`](effects/parallax/SPEC.md).
+| Unit | TIME | DEPTH |
+|---|---|---|
+| **BALLISTIC** | RANGE | TRAJECTORY |
+| **RAINFALL** | DENSITY | WEATHER |
+| **SWARMDELAY** | DIVISION | DIVERGENCE |
+| **GLITCHREPEAT** | SLICE | CHANCE |
+| **BUCKETLINE** | DELAY | AGE |
+| **LONGMEMORY** | LENGTH | MEMORY |
+| **SHARD** | PITCH | GRAIN |
 
-### CHORDGHOST
+## Human Soon RevFX
 
-**Status:** compiled M1 / ready for physical MkI QA; feature development paused after initial architecture
+All current custom reverbs use `SHIFT+DEPTH` / `k_user_revfx_param_shift_depth` for **MIX**.
 
-A harmonic delay whose dry signal remains unchanged while wet repeats follow the current chord progression. The first controller target is the OXI One MKII.
-
-```text
-dry input -------------------------------> dry out
-    |
-    +--> delay --> harmonic retune --> feedback --> wet out
-                       ^
-                       |
-                 current chord
-```
-
-See [`effects/chordghost/SPEC.md`](effects/chordghost/SPEC.md).
-
-### DUST
-
-**Status:** compiled M1 / ready for physical MkI QA
-
-A clean-room sample-rate and bit-depth reduction design. TIME controls RATE; DEPTH controls DAMAGE. Strong settings introduce a bounded stereo clock fracture so left and right alias structures can decorrelate.
-
-See [`effects/dust/README.md`](effects/dust/README.md).
-
-### CARRIER
-
-**Status:** compiled M1 / ready for physical MkI QA
-
-A clean-room amplitude/ring-modulation design. TIME controls FREQUENCY. DEPTH is a POLARITY macro that traverses dry -> unipolar AM -> bipolar ring modulation. Strong ring settings introduce a bounded stereo carrier-phase split.
-
-See [`effects/carrier/README.md`](effects/carrier/README.md).
-
-### Human Soon Effects Suite
-
-DUST and CARRIER are the first units in a wider clean-room effects roadmap that studies broad DSP categories present in the Korg logue ecosystem while implementing original Human Soon algorithms, mappings, and behaviors.
-
-See [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md).
-
-## Hardware testing
-
-Compilation is not hardware validation. Every unit marked ready for test has a project-specific QA sheet.
-
-See [`TESTING.md`](TESTING.md).
+- **ABYSS** — modulated four-line FDN; TIME=DECAY, DEPTH=SPACE.
+- **AUREOLE** — bounded octave-feedback shimmer FDN; TIME=DECAY, DEPTH=HALO.
+- **NEBULA** — four-grain diffusion cloud; TIME=SPACE, DEPTH=CLOUD.
 
 ## Target platform
 
 - Korg Nu:Tekt NTS-1 digital kit, original/MkI
 - logue SDK API `1.1-0`
 - NTS-1 firmware `>= 1.02`
-- current unit types: `osc`, `modfx`, and `delfx`
+- unit types: `osc`, `modfx`, `delfx`, `revfx`
 
-Official templates used as build bases:
+Official Korg build bases:
 
 - `platform/nutekt-digital/dummy-osc`
 - `platform/nutekt-digital/dummy-modfx`
 - `platform/nutekt-digital/dummy-delfx`
+- `platform/nutekt-digital/dummy-revfx`
 
-in Korg's [`logue-sdk`](https://github.com/korginc/logue-sdk).
-
-## Development principle
-
-Build each project in small hardware-testable layers. Do not hide several unproven DSP systems inside one milestone.
-
-Current rule set:
+## Development rule
 
 1. implement one bounded milestone
 2. compile against Korg's current template in GitHub Actions
 3. package `.ntkdigunit`
-4. add the unit and QA sheet to the hardware test queue
+4. provide a project-specific QA sheet
 5. test on the physical original NTS-1
-6. only then expand the DSP architecture
+6. only then expand/calibrate the DSP architecture
 
-## Repository layout
+The consolidated CI workflow `.github/workflows/build-full-test-suite.yml` rebuilds every current unit in one run, records text/data/BSS sizes, and packages the binaries plus QA sheets as one test artifact.
 
-```text
-Nts-1-custom-effects/
-├── README.md
-├── TESTING.md
-├── LICENSE
-├── oscillators/
-│   └── spectra/
-└── effects/
-    ├── parallax/
-    ├── chordghost/
-    ├── dust/
-    ├── carrier/
-    └── humansoon-suite/
-        └── ROADMAP.md
-```
+## Clean-room policy
 
-The NTS-1 project folders are **overlay/scaffolds** for Korg's official templates rather than vendored copies of the complete SDK/toolchain.
+The Human Soon suite may use public product categories as inspiration, but it does not copy commercial source, binaries, presets, UI text or proprietary implementation details, and it does not reverse engineer commercial units. See the roadmap for the detailed rule set.
 
 ## References
 
 - [Korg logue SDK](https://github.com/korginc/logue-sdk)
 - [Nu:Tekt NTS-1 SDK platform](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital)
-- [Official NTS-1 oscillator template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-osc)
-- [Official NTS-1 modulation FX template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-modfx)
-- [Official NTS-1 delay template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-delfx)
 - [Korg unit index](https://korginc.github.io/logue-sdk/unit-index/)
 
 ## License
