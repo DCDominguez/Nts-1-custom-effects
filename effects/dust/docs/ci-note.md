@@ -1,0 +1,1 @@
+CI is expected to use the reusable `.github/workflows/build-modfx.yml` matrix. DUST is the first project in that matrix; future modulation effects should be added there instead of creating one workflow per unit.
