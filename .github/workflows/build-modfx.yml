@@ -5,11 +5,17 @@ on:
     paths:
       - 'effects/dust/**'
       - 'effects/carrier/**'
+      - 'effects/vectorfilter/**'
+      - 'effects/ironrot/**'
+      - 'effects/attractor/**'
       - '.github/workflows/build-modfx.yml'
   pull_request:
     paths:
       - 'effects/dust/**'
       - 'effects/carrier/**'
+      - 'effects/vectorfilter/**'
+      - 'effects/ironrot/**'
+      - 'effects/attractor/**'
       - '.github/workflows/build-modfx.yml'
   workflow_dispatch:
 
@@ -24,19 +30,22 @@ jobs:
             source: effects/dust/nts1
           - name: carrier
             source: effects/carrier/nts1
+          - name: vectorfilter
+            source: effects/vectorfilter/nts1
+          - name: ironrot
+            source: effects/ironrot/nts1
+          - name: attractor
+            source: effects/attractor/nts1
 
     steps:
       - name: Checkout project
         uses: actions/checkout@v4
-
       - name: Install ARM toolchain
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-arm-none-eabi zip
-
       - name: Clone Korg logue SDK
         run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
-
       - name: Prepare ${{ matrix.name }} project
         run: |
           cp -a logue-sdk/platform/nutekt-digital/dummy-modfx logue-sdk/platform/nutekt-digital/${{ matrix.name }}
@@ -44,7 +53,6 @@ jobs:
           cp ${{ matrix.source }}/project.mk logue-sdk/platform/nutekt-digital/${{ matrix.name }}/project.mk
           mkdir -p logue-sdk/platform/nutekt-digital/${{ matrix.name }}/src
           cp -a ${{ matrix.source }}/src/. logue-sdk/platform/nutekt-digital/${{ matrix.name }}/src/
-
       - name: Build ${{ matrix.name }}
         run: |
           cd logue-sdk/platform/nutekt-digital/${{ matrix.name }}
@@ -52,14 +60,12 @@ jobs:
           make GCC_BIN_PATH=/usr/bin install
           arm-none-eabi-size build/${{ matrix.name }}.elf
           ls -lh ${{ matrix.name }}.ntkdigunit
-
       - name: Stage artifact
         run: |
           mkdir -p artifacts
           cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/${{ matrix.name }}.ntkdigunit artifacts/
           cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/build/${{ matrix.name }}.map artifacts/
           cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/build/${{ matrix.name }}.list artifacts/
-
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
