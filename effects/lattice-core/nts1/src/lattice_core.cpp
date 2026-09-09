@@ -10,10 +10,6 @@ static const uint32_t kBufferMask = kBufferSize - 1u;
 static const uint32_t kMaxVoices = 8u;
 static const float kParamSlew = 0.0015f;
 
-// MkI ModFX SDRAM is tight enough that a stereo 32768-sample history does not
-// fit. LATTICE CORE only needs one captured source stream: the voices create
-// stereo later through their independent pan positions. Keeping the history
-// mono preserves the full ~683 ms capture window while fitting the target.
 __sdram float s_buffer[kBufferSize];
 
 struct LoopVoice {
@@ -44,11 +40,13 @@ static const float kAgeMs[kMaxVoices] = {
 };
 
 static const float kPan[kMaxVoices] = {
-  -0.86f, 0.64f, -0.31f, 0.88f, 0.18f, -0.67f, 0.43f, -0.08f
+  -0.92f, 0.77f, -0.44f, 0.95f, 0.28f, -0.79f, 0.57f, -0.12f
 };
 
+// 0.1-1 character pass: substantially stronger wet field. The previous
+// normalization made the microloops technically present but perceptually shy.
 static const float kWetGain[9] = {
-  0.0f, 0.43f, 0.32f, 0.27f, 0.235f, 0.215f, 0.198f, 0.185f, 0.175f
+  0.0f, 0.90f, 0.72f, 0.62f, 0.56f, 0.51f, 0.47f, 0.44f, 0.42f
 };
 
 static inline float clamp01(float x) {
@@ -136,7 +134,9 @@ static inline float grain_window(float phase) {
 }
 
 static inline uint32_t repeat_count_for_voice(uint32_t i) {
-  return 2u + (i % 3u);
+  // More repetitions make the interval rule read as a phrase instead of a
+  // fleeting texture. 4..7 repeats depending on voice.
+  return 4u + (i & 3u);
 }
 
 static void capture_voice(uint32_t i, uint32_t pattern) {
@@ -225,8 +225,8 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
       main_yn[f * 2u + 1u] = in_r;
     } else {
       const float wg = kWetGain[active];
-      main_yn[f * 2u] = clamp_audio(in_l * 0.72f + wet_l * wg);
-      main_yn[f * 2u + 1u] = clamp_audio(in_r * 0.72f + wet_r * wg);
+      main_yn[f * 2u] = clamp_audio(in_l * 0.58f + wet_l * wg);
+      main_yn[f * 2u + 1u] = clamp_audio(in_r * 0.58f + wet_r * wg);
     }
 
     s_write = (s_write + 1u) & kBufferMask;
