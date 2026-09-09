@@ -6,9 +6,9 @@ The repository treats the NTS-1 as a programmable musical system rather than a c
 
 ## Current status
 
-**25 current units have an M1 build path and hardware QA sheet.** Compilation is not physical validation: every unit remains **READY FOR TEST** until its project QA passes on the original NTS-1 MkI.
+**All 25 current M1 units compile and have been reported working correctly on the physical original NTS-1 MkI.** The M1 suite is now hardware validated at suite level.
 
-See [`TESTING.md`](TESTING.md) for the complete hardware queue and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
+See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
 ## Oscillator
 
@@ -19,7 +19,7 @@ The MkI oscillator API outputs one sample per frame, so SPECTRA is intentionally
 ## Core experimental effects
 
 - **PARALLAX** (`delfx`) — four-voice decorrelated spatial chorus/doubler field. Fixed true pitch-shift voices remain a later milestone.
-- **CHORDGHOST** (`delfx`) — harmonic-delay architecture; M1 is the BPM-synced delay foundation and feature development remains paused until QA.
+- **CHORDGHOST** (`delfx`) — harmonic-delay architecture; M1 is the BPM-synced delay foundation and feature development remains paused after M1 validation.
 
 ## Human Soon ModFX
 
@@ -84,6 +84,8 @@ Official Korg build bases:
 6. only then expand/calibrate the DSP architecture
 
 The consolidated CI workflow `.github/workflows/build-full-test-suite.yml` rebuilds every current unit in one run, records text/data/BSS sizes, and packages the binaries plus QA sheets as one test artifact.
+
+Any M2 or later DSP change reopens the hardware gate for the affected unit.
 
 ## Clean-room policy
 
