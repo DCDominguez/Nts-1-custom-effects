@@ -26,7 +26,7 @@ Korg's public unit index (last updated 2025-02-26) lists 22 Sinevibes effects fo
 |---|---|---|---|---|
 | Blend | multi-voice chorus | **PARALLAX** | `delfx` | Already built; spatially independent voices rather than a direct chorus recreation |
 | Corrosion | multi-algorithm distortion | **IRONROT** | `modfx` | Planned: nonlinear stages + tone-dependent mutation |
-| DCM8 | sample-rate / bit-depth reduction | **DUST** | `modfx` | Planned: reducer + controlled alias topology |
+| DCM8 | sample-rate / bit-depth reduction | **DUST** | `modfx` | **M1 compiled; ready for MkI QA.** RATE + DAMAGE macros with bounded stereo clock fracture |
 | Dipole | through-zero flanger | **ZEROCROSS** | `modfx` | Planned: true through-zero sweep with asymmetric feedback |
 | Drift | chaotic stereo panner | **ATTRACTOR** | `modfx` | Planned: deterministic chaotic motion with controllable orbit geometry |
 | Finite | granular pitch shifter | **SHARD** | `modfx` or `delfx` after profiling | Planned: multi-grain pitch field, not a direct clone |
@@ -46,14 +46,14 @@ Korg's public unit index (last updated 2025-02-26) lists 22 Sinevibes effects fo
 | Albedo | granular cloud reverb | **NEBULA** | `revfx` | Planned: granular diffusion cloud with density transitions |
 | Hollow | large FDN reverb | **ABYSS** | `revfx` | Planned: modulated FDN for huge non-metallic spaces |
 | Luminance | shimmer FDN reverb | **AUREOLE** | `revfx` | Planned: FDN + pitched feedback with bounded shimmer |
-| Downgrade (2026 watch) | lo-fi degradation | **DUST** extension | `modfx` | Fold into DUST rather than duplicate the reducer family |
+| Downgrade (2026 watch) | lo-fi degradation | **DUST** extension | `modfx` | Folded into DUST family rather than duplicating the reducer class |
 | Malfunction (2026 watch) | unstable / nonlinear filter | **FAULTLINE** | `modfx` | Planned: deliberately unstable but bounded filter topology |
 
 ## Build order
 
 ### Wave 1 — low-risk modulation processors
 
-1. **DUST** — bit-depth + sample-rate reduction
+1. **DUST** — bit-depth + sample-rate reduction — **M1 compiled / ready for QA**
 2. **CARRIER** — ring / amplitude modulation
 3. **VECTORFILTER** — state-variable filter
 4. **IRONROT** — distortion family
@@ -91,6 +91,7 @@ Reverbs and granular units come last because they are the strongest SRAM/SDRAM a
 
 - Every unit must compile in GitHub Actions before hardware testing.
 - Every unit gets a physical MkI test gate before feature expansion.
+- Every READY FOR TEST unit must have a project-specific QA sheet.
 - Parameter changes must be smoothed where discontinuities can click or explode.
 - Feedback structures must have explicit gain bounds and runaway protection.
 - Prefer one strong musical macro per physical control over exposing implementation detail.
