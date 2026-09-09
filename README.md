@@ -8,7 +8,7 @@ The goal is not to recreate conventional pedals or stock synth voices. These pro
 
 ### SPECTRA
 
-**Status:** specification + first oscillator scaffold
+**Status:** compiled / ready for physical MkI QA
 
 A four-voice swarm oscillator. One incoming pitch becomes an internal ensemble with waveform morphing, detune spread, interval constellations, independent low-rate drift, and bounded per-note mutation.
 
@@ -33,21 +33,9 @@ See [`oscillators/spectra/SPEC.md`](oscillators/spectra/SPEC.md).
 
 ### PARALLAX
 
-**Status:** specification + M1 spatial-field scaffold
+**Status:** compiled M1 / ready for physical MkI QA
 
 A four-voice spatial chorus / swarm doubler. Each wet voice can occupy a different time, pitch, modulation trajectory, and stereo position.
-
-```text
-INPUT
-  +-- voice A: pitch A / time A / pan A
-  +-- voice B: pitch B / time B / pan B
-  +-- voice C: pitch C / time C / pan C
-  +-- voice D: pitch D / time D / pan D
-                     |
-                 stereo sum
-                     |
-                    OUT
-```
 
 M1 implements four decorrelated modulated delay taps with independent stereo anchors. True fixed pitch offsets are intentionally deferred until the spatial field is proven on hardware.
 
@@ -55,7 +43,7 @@ See [`effects/parallax/SPEC.md`](effects/parallax/SPEC.md).
 
 ### CHORDGHOST
 
-**Status:** specification + scaffold, paused after initial architecture
+**Status:** compiled M1 / ready for physical MkI QA; feature development paused after initial architecture
 
 A harmonic delay whose dry signal remains unchanged while wet repeats follow the current chord progression. The first controller target is the OXI One MKII.
 
@@ -70,16 +58,45 @@ dry input -------------------------------> dry out
 
 See [`effects/chordghost/SPEC.md`](effects/chordghost/SPEC.md).
 
+### DUST
+
+**Status:** compiled M1 / ready for physical MkI QA
+
+A clean-room sample-rate and bit-depth reduction design. TIME controls RATE; DEPTH controls DAMAGE. Strong settings introduce a bounded stereo clock fracture so left and right alias structures can decorrelate.
+
+See [`effects/dust/README.md`](effects/dust/README.md).
+
+### CARRIER
+
+**Status:** compiled M1 / ready for physical MkI QA
+
+A clean-room amplitude/ring-modulation design. TIME controls FREQUENCY. DEPTH is a POLARITY macro that traverses dry -> unipolar AM -> bipolar ring modulation. Strong ring settings introduce a bounded stereo carrier-phase split.
+
+See [`effects/carrier/README.md`](effects/carrier/README.md).
+
+### Human Soon Effects Suite
+
+DUST and CARRIER are the first units in a wider clean-room effects roadmap that studies broad DSP categories present in the Korg logue ecosystem while implementing original Human Soon algorithms, mappings, and behaviors.
+
+See [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md).
+
+## Hardware testing
+
+Compilation is not hardware validation. Every unit marked ready for test has a project-specific QA sheet.
+
+See [`TESTING.md`](TESTING.md).
+
 ## Target platform
 
 - Korg Nu:Tekt NTS-1 digital kit, original/MkI
 - logue SDK API `1.1-0`
 - NTS-1 firmware `>= 1.02`
-- current unit types: `osc` and `delfx`
+- current unit types: `osc`, `modfx`, and `delfx`
 
-Official templates:
+Official templates used as build bases:
 
 - `platform/nutekt-digital/dummy-osc`
+- `platform/nutekt-digital/dummy-modfx`
 - `platform/nutekt-digital/dummy-delfx`
 
 in Korg's [`logue-sdk`](https://github.com/korginc/logue-sdk).
@@ -88,54 +105,31 @@ in Korg's [`logue-sdk`](https://github.com/korginc/logue-sdk).
 
 Build each project in small hardware-testable layers. Do not hide several unproven DSP systems inside one milestone.
 
-For SPECTRA:
+Current rule set:
 
-1. build/load official `dummy-osc`
-2. stable 1–4 voice source + SHAPE morph
-3. Spread + interval constellations + ALT morph
-4. independent Drift/Motion
-5. bounded per-note Chaos
-6. high-note alias/CPU tuning
-7. SPECTRA + PARALLAX integration
-
-For PARALLAX:
-
-1. four-voice modulated spatial field
-2. one true pitch-shift voice
-3. two, then four pitch-shift voices if CPU permits
-4. tune the default constellation
-5. add slow bounded spatial drift
-6. extract the pitch engine for reuse in CHORDGHOST
-
-For CHORDGHOST:
-
-1. plain BPM-synced delay
-2. OXI chord-state decoding
-3. fixed semitone pitch shifting
-4. monophonic pitch detection
-5. chord-tone selection and voice leading
-6. hardware profiling and musical tuning
+1. implement one bounded milestone
+2. compile against Korg's current template in GitHub Actions
+3. package `.ntkdigunit`
+4. add the unit and QA sheet to the hardware test queue
+5. test on the physical original NTS-1
+6. only then expand the DSP architecture
 
 ## Repository layout
 
 ```text
 Nts-1-custom-effects/
 ├── README.md
+├── TESTING.md
 ├── LICENSE
 ├── oscillators/
 │   └── spectra/
-│       ├── README.md
-│       ├── SPEC.md
-│       ├── docs/
-│       │   ├── dsp-architecture.md
-│       │   └── test-plan.md
-│       └── nts1/
-│           ├── manifest.json
-│           ├── project.mk
-│           └── src/spectra.cpp
 └── effects/
     ├── parallax/
-    └── chordghost/
+    ├── chordghost/
+    ├── dust/
+    ├── carrier/
+    └── humansoon-suite/
+        └── ROADMAP.md
 ```
 
 The NTS-1 project folders are **overlay/scaffolds** for Korg's official templates rather than vendored copies of the complete SDK/toolchain.
@@ -145,8 +139,9 @@ The NTS-1 project folders are **overlay/scaffolds** for Korg's official template
 - [Korg logue SDK](https://github.com/korginc/logue-sdk)
 - [Nu:Tekt NTS-1 SDK platform](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital)
 - [Official NTS-1 oscillator template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-osc)
+- [Official NTS-1 modulation FX template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-modfx)
 - [Official NTS-1 delay template](https://github.com/korginc/logue-sdk/tree/main/platform/nutekt-digital/dummy-delfx)
-- [Korg oscillator unit index](https://korginc.github.io/logue-sdk/unit-index/osc/)
+- [Korg unit index](https://korginc.github.io/logue-sdk/unit-index/)
 
 ## License
 
