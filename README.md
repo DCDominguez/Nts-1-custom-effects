@@ -6,11 +6,13 @@ The repository treats the NTS-1 as a programmable musical system rather than a c
 
 ## Current status
 
-**All 25 current M1 units compile and have been reported working correctly on the physical original NTS-1 MkI.** The M1 suite is now hardware validated at suite level.
+**All 25 current M1 units compile and have been reported working correctly on the physical original NTS-1 MkI.** The M1 suite is hardware validated at suite level.
+
+Four experiments are now **retired from active development and moved to the backburner**: **PARALLAX, IRONROT, ZEROCROSS and NEBULA**. Their source, docs, test builds and historical validation records remain preserved, but they will not advance through M2–M4 unless they are deliberately redesigned and reopened. See **[BACKBURNER.md](BACKBURNER.md)**.
 
 For descriptions, control mappings and practical instructions for every current unit, see the **[Human Soon NTS-1 User Guide](USER_GUIDE.md)**.
 
-For the complete next-stage plan, including project-specific **M2, M3 and M4** goals for all 25 units, see **[M2–M4 Milestones](MILESTONES_M2_M4.md)**.
+For the next-stage plan for active projects, see **[M2–M4 Milestones](MILESTONES_M2_M4.md)**. Backburnered entries in that older roadmap are superseded by `BACKBURNER.md` until explicitly reopened.
 
 See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
@@ -22,7 +24,7 @@ The MkI oscillator API outputs one sample per frame, so SPECTRA is intentionally
 
 ## Core experimental effects
 
-- **PARALLAX** (`delfx`) — four-voice decorrelated spatial chorus/doubler field. Fixed true pitch-shift voices remain a later milestone.
+- **PARALLAX** (`delfx`) — **BACKBURNER**. Intended as a delay whose trails move through stereo position and time; current versions read too strongly as chorus/ensemble.
 - **CHORDGHOST** (`delfx`) — harmonic-delay architecture; M1 is the BPM-synced delay foundation and feature development remains paused after M1 validation.
 
 ## Human Soon ModFX
@@ -32,9 +34,9 @@ The MkI oscillator API outputs one sample per frame, so SPECTRA is intentionally
 | **DUST** | TIME=RATE; DEPTH=DAMAGE — sample-rate/bit reduction + stereo fracture |
 | **CARRIER** | TIME=FREQUENCY; DEPTH=POLARITY — dry→AM→ring + stereo phase split |
 | **VECTORFILTER** | TIME=CUTOFF; DEPTH=VECTOR — LP→BP→HP morph |
-| **IRONROT** | TIME=CHARACTER; DEPTH=CORROSION — bounded tone-dependent distortion |
+| **IRONROT** | **BACKBURNER** — TIME=CHARACTER; DEPTH=CORROSION — current architecture lacks a strong enough corrosion identity |
 | **ATTRACTOR** | TIME=RATE; DEPTH=ORBIT — deterministic chaotic stereo motion |
-| **ZEROCROSS** | TIME=RATE; DEPTH=SWEEP — through-zero flanger architecture |
+| **ZEROCROSS** | **BACKBURNER** — TIME=RATE; DEPTH=SWEEP — functional through-zero core, but currently too close to a conventional flanger |
 | **PHASEWELL** | TIME=RATE; DEPTH=DEPTH/RESONANCE — six-stage asymmetric phaser |
 | **ASCENDER** | TIME=CLIMB; DEPTH=HEIGHT — barber-pole phaser |
 | **HELIX** | TIME=ROTATION; DEPTH=HELIX — barber-pole flanger |
@@ -62,7 +64,7 @@ All current custom reverbs use `SHIFT+DEPTH` / `k_user_revfx_param_shift_depth` 
 
 - **ABYSS** — modulated four-line FDN; TIME=DECAY, DEPTH=SPACE.
 - **AUREOLE** — bounded octave-feedback shimmer FDN; TIME=DECAY, DEPTH=HALO.
-- **NEBULA** — four-grain diffusion cloud; TIME=SPACE, DEPTH=CLOUD.
+- **NEBULA** — **BACKBURNER**. The current cloud architecture does not yet produce a convincing enough particle/grain-to-reverb identity, and an earlier build was reported to clip.
 
 ## Target platform
 
@@ -80,12 +82,13 @@ Official Korg build bases:
 
 ## Development rule
 
-1. implement one bounded milestone
-2. compile against Korg's current template in GitHub Actions
-3. package `.ntkdigunit`
-4. provide a project-specific QA sheet
-5. test on the physical original NTS-1
-6. only then expand/calibrate the DSP architecture
+1. begin from a strong audible behavior or interaction idea
+2. implement one bounded milestone
+3. compile against Korg's current template in GitHub Actions
+4. package `.ntkdigunit`
+5. provide a project-specific QA sheet
+6. test on the physical original NTS-1
+7. only then expand/calibrate the DSP architecture
 
 The consolidated CI workflow `.github/workflows/build-full-test-suite.yml` rebuilds every current unit in one run, records text/data/BSS sizes, and packages the binaries plus QA sheets as one test artifact.
 
@@ -93,7 +96,7 @@ Any M2 or later DSP change reopens the hardware gate for the affected unit.
 
 ## Clean-room policy
 
-The Human Soon suite may use public product categories as inspiration, but it does not copy commercial source, binaries, presets, UI text or proprietary implementation details, and it does not reverse engineer commercial units. See the roadmap for the detailed rule set.
+The Human Soon suite may use public product categories and high-level interaction ideas as inspiration, but it does not copy commercial source, binaries, presets, UI text or proprietary implementation details, and it does not reverse engineer commercial units. A future design may study the broad musical behavior of a familiar device, reduce that behavior to a small NTS-1-suitable core, and then build an original Human Soon interpretation around it. See `BACKBURNER.md` for the current design reset.
 
 ## References
 
