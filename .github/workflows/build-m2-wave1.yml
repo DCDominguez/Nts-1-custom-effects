@@ -1,0 +1,92 @@
+name: Build M2 Wave 1 Test Drop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-m2-wave1.yml'
+      - 'oscillators/spectra/**'
+      - 'effects/parallax/**'
+      - 'effects/chordghost/**'
+      - 'effects/dust/**'
+      - 'effects/carrier/**'
+      - 'effects/vectorfilter/**'
+      - 'effects/ironrot/**'
+      - 'effects/attractor/**'
+
+jobs:
+  build-m2-wave1:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Run CHORDGHOST protocol unit test
+        run: |
+          g++ -std=c++11 -Wall -Wextra -Werror effects/chordghost/tests/chord_protocol_test.cpp -o /tmp/chord_protocol_test
+          /tmp/chord_protocol_test
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone current Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Build M2 Wave 1 units
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p drop/binaries drop/qa
+          printf '# Human Soon NTS-1 M2 Wave 1 Build Matrix\n\n' > drop/BUILD_MATRIX_M2.md
+          printf 'Source commit: `%s`\n\n' "$GITHUB_SHA" >> drop/BUILD_MATRIX_M2.md
+          printf '| Project | Module | text | data | bss | total |\n|---|---|---:|---:|---:|---:|\n' >> drop/BUILD_MATRIX_M2.md
+
+          build_one() {
+            local name="$1"
+            local source="$2"
+            local module="$3"
+            local template="$4"
+            local target="logue-sdk/platform/nutekt-digital/${name}"
+            cp -a "logue-sdk/platform/nutekt-digital/${template}" "$target"
+            cp "${source}/manifest.json" "$target/manifest.json"
+            cp "${source}/project.mk" "$target/project.mk"
+            mkdir -p "$target/src"
+            cp -a "${source}/src/." "$target/src/"
+            (
+              cd "$target"
+              make GCC_BIN_PATH=/usr/bin
+              make GCC_BIN_PATH=/usr/bin install
+            )
+            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${name}.elf" | tail -n 1)"
+            printf '| %s | `%s` | %s | %s | %s | %s |\n' "$name" "$module" "$text" "$data" "$bss" "$dec" >> drop/BUILD_MATRIX_M2.md
+            cp "$target/${name}.ntkdigunit" drop/binaries/
+          }
+
+          build_one spectra oscillators/spectra/nts1 osc dummy-osc
+          build_one parallax effects/parallax/nts1 delfx dummy-delfx
+          build_one chordghost effects/chordghost/nts1 delfx dummy-delfx
+          build_one dust effects/dust/nts1 modfx dummy-modfx
+          build_one carrier effects/carrier/nts1 modfx dummy-modfx
+          build_one vectorfilter effects/vectorfilter/nts1 modfx dummy-modfx
+          build_one ironrot effects/ironrot/nts1 modfx dummy-modfx
+          build_one attractor effects/attractor/nts1 modfx dummy-modfx
+
+          cp oscillators/spectra/docs/qa-m2.md drop/qa/spectra-qa-m2.md
+          cp effects/parallax/docs/qa-m2.md drop/qa/parallax-qa-m2.md
+          cp effects/chordghost/docs/qa-m2.md drop/qa/chordghost-qa-m2.md
+          cp effects/dust/docs/qa-m2.md drop/qa/dust-qa-m2.md
+          cp effects/carrier/docs/qa-m2.md drop/qa/carrier-qa-m2.md
+          cp effects/vectorfilter/docs/qa-m2.md drop/qa/vectorfilter-qa-m2.md
+          cp effects/ironrot/docs/qa-m2.md drop/qa/ironrot-qa-m2.md
+          cp effects/attractor/docs/qa-m2.md drop/qa/attractor-qa-m2.md
+          cp MILESTONES_M2_M4.md drop/
+          printf '\nAll binaries in this artifact are M2 candidates and require physical MkI QA before promotion.\n' >> drop/BUILD_MATRIX_M2.md
+
+      - name: Upload M2 Wave 1 test drop
+        uses: actions/upload-artifact@v4
+        with:
+          name: human-soon-m2-wave1-test
+          path: drop/
+          if-no-files-found: error
