@@ -24,6 +24,8 @@ M1 is the frozen known-good baseline. Any later DSP change that alters behavior,
 
 For practical descriptions and control instructions, see [`../../USER_GUIDE.md`](../../USER_GUIDE.md).
 
+For the complete project-by-project M2, M3 and M4 plan, see [`../../MILESTONES_M2_M4.md`](../../MILESTONES_M2_M4.md).
+
 ## Capability map
 
 | Public functional reference | Broad DSP class | Human Soon project | Slot | M1 distinction |
@@ -104,7 +106,7 @@ The exact feature differs by project, but the suite uses this shared interpretat
 - **M3 — Human Soon behavior:** add the characteristic controlled instability, stochastic behavior, alternate modes, nonlinear interactions, or evolving relationships that give the effect its own identity.
 - **M4 — Instrument/release tuning:** hardware calibration, parameter ranges, gain staging, CPU optimization, smoothing, aliasing cleanup, extreme-setting behavior, default character, and integration testing.
 
-Project-specific specs may subdivide or extend these milestones where necessary.
+Detailed implementation targets for every current unit are in [`../../MILESTONES_M2_M4.md`](../../MILESTONES_M2_M4.md). Project-specific specs may subdivide or extend these milestones where necessary.
 
 ## Next phase
 
