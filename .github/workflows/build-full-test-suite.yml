@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - 'oscillators/**/nts1/**'
+      - 'oscillators/**/docs/qa-sheet.md'
+      - 'effects/**/nts1/**'
+      - 'effects/**/docs/qa-sheet.md'
+      - 'TESTING.md'
       - '.github/workflows/build-full-test-suite.yml'
 
 jobs:
@@ -54,8 +59,7 @@ jobs:
             printf '| %s | `%s` | %s | %s | %s | %s |\n' "$name" "$module" "$text" "$data" "$bss" "$dec" >> suite/BUILD_MATRIX.md
             cp "$target/${name}.ntkdigunit" suite/binaries/
 
-            local root
-            if [[ "$source" == */nts1 ]]; then root="${source%/nts1}"; else root="$source"; fi
+            local root="${source%/nts1}"
             if [[ -f "$root/docs/qa-sheet.md" ]]; then
               cp "$root/docs/qa-sheet.md" "suite/qa/${name}-qa-sheet.md"
             fi
