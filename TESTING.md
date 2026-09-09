@@ -10,6 +10,7 @@ Compilation is not hardware validation. A unit stays in this queue until it load
 | PARALLAX | `delfx` | PASS | READY FOR TEST | [PARALLAX QA](effects/parallax/docs/qa-sheet.md) | Four decorrelated taps, SPREAD, DIVERGENCE, MIX, stereo field, mono compatibility, stability |
 | CHORDGHOST | `delfx` | PASS | READY FOR TEST | [CHORDGHOST QA](effects/chordghost/docs/qa-sheet.md) | BPM-synced M1 delay, division changes, MIX, 10-minute stability; then OXI CC chord decode |
 | DUST | `modfx` | PASS | READY FOR TEST | [DUST QA](effects/dust/docs/qa-sheet.md) | RATE, DAMAGE, silence, stereo fracture, mono collapse, parameter abuse, 30-minute stability |
+| CARRIER | `modfx` | PASS | READY FOR TEST | [CARRIER QA](effects/carrier/docs/qa-sheet.md) | FREQUENCY, POLARITY dry→AM→ring, sideband split, mono collapse, aliasing, abuse, 30-minute stability |
 
 ## QA rule
 
@@ -35,4 +36,4 @@ Each QA pass should record:
 
 ## Current status
 
-SPECTRA, PARALLAX, CHORDGHOST and DUST compile successfully against Korg's current `nutekt-digital` SDK templates. None has yet been marked hardware-validated.
+SPECTRA, PARALLAX, CHORDGHOST, DUST and CARRIER compile successfully against Korg's current `nutekt-digital` SDK templates. None has yet been marked hardware-validated.
