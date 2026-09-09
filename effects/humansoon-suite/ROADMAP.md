@@ -30,7 +30,7 @@ Korg's public unit index (last updated 2025-02-26) lists 22 Sinevibes effects fo
 | Dipole | through-zero flanger | **ZEROCROSS** | `modfx` | Planned: true through-zero sweep with asymmetric feedback |
 | Drift | chaotic stereo panner | **ATTRACTOR** | `modfx` | Planned: deterministic chaotic motion with controllable orbit geometry |
 | Finite | granular pitch shifter | **SHARD** | `modfx` or `delfx` after profiling | Planned: multi-grain pitch field, not a direct clone |
-| Ring | ring modulation | **CARRIER** | `modfx` | Planned: ring / AM morph with sideband tilt |
+| Ring | ring modulation | **CARRIER** | `modfx` | **M1 compiled; ready for MkI QA.** Dry→AM→ring POLARITY macro + bounded stereo carrier-phase split |
 | Shift | frequency shifter | **SIDEBAND** | `modfx` | Planned: quadrature frequency shift + stereo divergence |
 | SVF | resonant state-variable filter | **VECTORFILTER** | `modfx` | Planned: morphing multimode filter with controlled instability |
 | Vibrant | deep phaser | **PHASEWELL** | `modfx` | Planned: asymmetric all-pass network |
@@ -54,7 +54,7 @@ Korg's public unit index (last updated 2025-02-26) lists 22 Sinevibes effects fo
 ### Wave 1 — low-risk modulation processors
 
 1. **DUST** — bit-depth + sample-rate reduction — **M1 compiled / ready for QA**
-2. **CARRIER** — ring / amplitude modulation
+2. **CARRIER** — ring / amplitude modulation — **M1 compiled / ready for QA**
 3. **VECTORFILTER** — state-variable filter
 4. **IRONROT** — distortion family
 5. **ATTRACTOR** — chaotic stereo panner
