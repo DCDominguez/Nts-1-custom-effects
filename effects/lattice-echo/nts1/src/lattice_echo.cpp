@@ -7,6 +7,7 @@ namespace {
 static const float kSampleRate = 48000.0f;
 static const uint32_t kBufferSize = 65536u;
 static const uint32_t kBufferMask = kBufferSize - 1u;
+static const uint32_t kTapCount = 12u;
 static const float kParamSlew = 0.0015f;
 
 __sdram float s_delay_l[kBufferSize];
@@ -30,6 +31,16 @@ static float s_mix_target = 0.35f;
 static float s_distance = 0.42f;
 static float s_pick = 0.45f;
 static float s_mix = 0.35f;
+
+static const float kTapRatio[kTapCount] = {
+  0.18f, 0.235f, 0.305f, 0.385f, 0.47f, 0.56f,
+  0.655f, 0.75f, 0.83f, 0.895f, 0.95f, 1.0f
+};
+
+static const float kTapWeight[kTapCount] = {
+  0.34f, 0.31f, 0.29f, 0.27f, 0.25f, 0.23f,
+  0.22f, 0.20f, 0.19f, 0.18f, 0.17f, 0.16f
+};
 
 static inline float clamp01(float x) {
   if (x < 0.0f) return 0.0f;
@@ -74,7 +85,7 @@ static inline bool selected_event(uint32_t mode, uint32_t event) {
 }
 
 static inline float distance_samples(float distance) {
-  const float seconds = 0.14f + 0.91f * distance * distance;
+  const float seconds = 0.18f + 0.92f * distance * distance;
   return seconds * kSampleRate;
 }
 
@@ -116,42 +127,60 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     if (s_refractory > 0u) --s_refractory;
 
     const bool onset = (s_refractory == 0u) &&
-                       (s_fast_env > s_slow_env * 1.72f + 0.010f) &&
-                       (s_fast_env > 0.018f);
+                       (s_fast_env > s_slow_env * 1.55f + 0.007f) &&
+                       (s_fast_env > 0.012f);
     if (onset) {
       ++s_event;
       s_capture_this_event = selected_event(pick_index(s_pick), s_event);
-      s_capture_remaining = static_cast<uint32_t>(kSampleRate * (0.040f + 0.055f * s_distance));
-      s_refractory = static_cast<uint32_t>(kSampleRate * 0.030f);
+      s_capture_remaining = static_cast<uint32_t>(kSampleRate * (0.052f + 0.085f * s_distance));
+      s_refractory = static_cast<uint32_t>(kSampleRate * 0.024f);
       s_flip = !s_flip;
     }
 
-    const float delay = distance_samples(s_distance);
-    const float echo_l = read_frac(s_delay_l, delay);
-    const float echo_r = read_frac(s_delay_r, delay * 1.011f + 13.0f);
+    const float base = distance_samples(s_distance);
+    float cloud_l = 0.0f;
+    float cloud_r = 0.0f;
 
-    s_fb_lp_l += (echo_l - s_fb_lp_l) * 0.36f;
-    s_fb_lp_r += (echo_r - s_fb_lp_r) * 0.36f;
-    const float feedback = 0.43f + 0.16f * s_distance;
+    // 0.1-1: selected material now fans out into twelve discrete arrivals.
+    // Alternating source/channel emphasis keeps the field wide without an LFO.
+    for (uint32_t t = 0u; t < kTapCount; ++t) {
+      const float dly_l = base * kTapRatio[t] + static_cast<float>((t * 17u) & 63u);
+      const float dly_r = base * kTapRatio[t] * (1.006f + 0.0015f * static_cast<float>(t)) + static_cast<float>((t * 29u) & 79u);
+      const float a = read_frac(s_delay_l, dly_l);
+      const float b = read_frac(s_delay_r, dly_r);
+      const float w = kTapWeight[t];
+      if ((t & 1u) == 0u) {
+        cloud_l += a * w;
+        cloud_r += b * w * 0.72f;
+      } else {
+        cloud_l += b * w * 0.72f;
+        cloud_r += a * w;
+      }
+    }
+
+    s_fb_lp_l += (cloud_l - s_fb_lp_l) * 0.22f;
+    s_fb_lp_r += (cloud_r - s_fb_lp_r) * 0.22f;
+    const float feedback = 0.46f + 0.23f * s_distance;
 
     float inject_l = 0.0f;
     float inject_r = 0.0f;
     if (s_capture_this_event && s_capture_remaining > 0u) {
-      const float focus_l = s_flip ? 0.88f : 0.52f;
-      const float focus_r = s_flip ? 0.52f : 0.88f;
+      const float focus_l = s_flip ? 0.95f : 0.58f;
+      const float focus_r = s_flip ? 0.58f : 0.95f;
       inject_l = in_l * focus_l;
       inject_r = in_r * focus_r;
       --s_capture_remaining;
       if (s_capture_remaining == 0u) s_capture_this_event = false;
     }
 
-    s_delay_l[s_write] = clamp_audio(inject_l + (s_fb_lp_l * 0.82f + s_fb_lp_r * 0.18f) * feedback);
-    s_delay_r[s_write] = clamp_audio(inject_r + (s_fb_lp_r * 0.82f + s_fb_lp_l * 0.18f) * feedback);
+    s_delay_l[s_write] = clamp_audio(inject_l + (s_fb_lp_l * 0.84f + s_fb_lp_r * 0.16f) * feedback);
+    s_delay_r[s_write] = clamp_audio(inject_r + (s_fb_lp_r * 0.84f + s_fb_lp_l * 0.16f) * feedback);
 
-    const float wet_l = echo_l * 0.78f;
-    const float wet_r = echo_r * 0.78f;
-    xn[f * 2u] = clamp_audio(in_l * (1.0f - s_mix) + wet_l * s_mix);
-    xn[f * 2u + 1u] = clamp_audio(in_r * (1.0f - s_mix) + wet_r * s_mix);
+    // Preserve enough direct signal that turning MIX up feels bigger, not smaller.
+    const float dry_gain = 1.0f - 0.42f * s_mix;
+    const float wet_gain = 0.42f + 0.90f * s_mix;
+    xn[f * 2u] = clamp_audio(in_l * dry_gain + cloud_l * wet_gain * s_mix);
+    xn[f * 2u + 1u] = clamp_audio(in_r * dry_gain + cloud_r * wet_gain * s_mix);
 
     s_write = (s_write + 1u) & kBufferMask;
   }
