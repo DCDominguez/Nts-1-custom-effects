@@ -1,0 +1,104 @@
+name: Build LATTICE System M1
+
+on:
+  push:
+    branches:
+      - lattice-suite
+    paths:
+      - 'effects/lattice-*/**'
+      - 'LATTICE_SYSTEM.md'
+      - '.github/workflows/build-lattice-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        unit:
+          - name: lattice-core
+            project: lattice_core
+            source: effects/lattice-core/nts1
+            template: dummy-modfx
+          - name: lattice-echo
+            project: lattice_echo
+            source: effects/lattice-echo/nts1
+            template: dummy-delfx
+          - name: lattice-cloud
+            project: lattice_cloud
+            source: effects/lattice-cloud/nts1
+            template: dummy-revfx
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone current Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Prepare ${{ matrix.unit.name }}
+        run: |
+          cp -a logue-sdk/platform/nutekt-digital/${{ matrix.unit.template }} logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}
+          cp ${{ matrix.unit.source }}/manifest.json logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/manifest.json
+          cp ${{ matrix.unit.source }}/project.mk logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/project.mk
+          mkdir -p logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/src
+          cp -a ${{ matrix.unit.source }}/src/. logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/src/
+
+      - name: Build ${{ matrix.unit.name }}
+        run: |
+          cd logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}
+          make GCC_BIN_PATH=/usr/bin
+          make GCC_BIN_PATH=/usr/bin install
+          arm-none-eabi-size build/${{ matrix.unit.project }}.elf
+          ls -lh ${{ matrix.unit.project }}.ntkdigunit
+
+      - name: Stage unit
+        run: |
+          mkdir -p artifacts/${{ matrix.unit.name }}
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/${{ matrix.unit.project }}.ntkdigunit artifacts/${{ matrix.unit.name }}/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/build/${{ matrix.unit.project }}.map artifacts/${{ matrix.unit.name }}/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.unit.project }}/build/${{ matrix.unit.project }}.list artifacts/${{ matrix.unit.name }}/
+          cp effects/${{ matrix.unit.name }}/docs/qa-m1.md artifacts/${{ matrix.unit.name }}/QA.md
+
+      - name: Upload unit
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.unit.name }}-nts1
+          path: artifacts/${{ matrix.unit.name }}/
+          if-no-files-found: error
+
+  bundle:
+    runs-on: ubuntu-22.04
+    needs: build
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Download built units
+        uses: actions/download-artifact@v4
+        with:
+          pattern: lattice-*-nts1
+          path: bundle
+          merge-multiple: true
+
+      - name: Package LATTICE M1 test drop
+        run: |
+          cp LATTICE_SYSTEM.md bundle/
+          cp effects/lattice-core/docs/qa-m1.md bundle/QA-LATTICE-CORE.md
+          cp effects/lattice-echo/docs/qa-m1.md bundle/QA-LATTICE-ECHO.md
+          cp effects/lattice-cloud/docs/qa-m1.md bundle/QA-LATTICE-CLOUD.md
+          cd bundle
+          zip -r ../Lattice-System-M1-Test.zip .
+
+      - name: Upload complete test drop
+        uses: actions/upload-artifact@v4
+        with:
+          name: lattice-system-m1-test
+          path: Lattice-System-M1-Test.zip
+          if-no-files-found: error
