@@ -10,6 +10,8 @@ The repository treats the NTS-1 as a programmable musical system rather than a c
 
 For descriptions, control mappings and practical instructions for every current unit, see the **[Human Soon NTS-1 User Guide](USER_GUIDE.md)**.
 
+For the complete next-stage plan, including project-specific **M2, M3 and M4** goals for all 25 units, see **[M2–M4 Milestones](MILESTONES_M2_M4.md)**.
+
 See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
 ## Oscillator
