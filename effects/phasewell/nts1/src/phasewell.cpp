@@ -1,0 +1,6 @@
+#include "usermodfx.h"
+#include <stdint.h>
+namespace { static constexpr float SR=48000.f; static float zL[6]={},zR[6]={},fbL=0,fbR=0,ph=0,rt=.25f,dt=.45f,r=.25f,d=.45f; static inline float c01(float x){return x<0?0:(x>1?1:x);} static inline float ca(float x){return x<-1?-1:(x>1?1:x);} static inline float wrap(float x){return x>=1?x-1:x;} static inline float ap(float x,float &z,float a){float y=-a*x+z;z=x+a*y;return y;} static void reset(){for(int i=0;i<6;i++)zL[i]=zR[i]=0;fbL=fbR=ph=0;} }
+void MODFX_INIT(uint32_t p,uint32_t a){(void)p;(void)a;reset();}
+void MODFX_PROCESS(const float*x,float*y,const float*sx,float*sy,uint32_t n){(void)sx;(void)sy;for(uint32_t i=0;i<n;i++){r+=(rt-r)*.0015f;d+=(dt-d)*.0015f;ph=wrap(ph+(.03f+1.6f*r*r)/SR);float mL=.5f+.5f*fx_sinf(ph),mR=.5f+.5f*fx_sinf(ph+.19f);float aL=.08f+(.25f+.58f*d)*mL,aR=.08f+(.25f+.58f*d)*mR;float q=.58f*d;float l=x[2*i]+fbL*q,rr=x[2*i+1]+fbR*q;for(int k=0;k<6;k++){l=ap(l,zL[k],aL);rr=ap(rr,zR[k],aR);}fbL=ca(l);fbR=ca(rr);float wet=.25f+.65f*d;y[2*i]=ca(x[2*i]*(1-wet)+l*wet);y[2*i+1]=ca(x[2*i+1]*(1-wet)+rr*wet);}}
+void MODFX_SUSPEND(){reset();}void MODFX_RESUME(){reset();}void MODFX_PARAM(uint8_t i,int32_t v){float n=c01(q31_to_f32(v));if(i==k_user_modfx_param_time)rt=n;else if(i==k_user_modfx_param_depth)dt=n;}
