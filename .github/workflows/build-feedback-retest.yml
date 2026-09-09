@@ -1,0 +1,79 @@
+name: Build IRONROT + NEBULA Feedback Retest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - m2-suite
+    paths:
+      - 'effects/ironrot/**'
+      - 'effects/nebula/**'
+      - '.github/workflows/build-feedback-retest.yml'
+
+jobs:
+  build-retest:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+
+      - name: Clone current Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+
+      - name: Build feedback retest units
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p drop/binaries drop/qa
+          printf '# Human Soon NTS-1 Feedback Retest\n\n' > drop/BUILD_MATRIX_RETEST.md
+          printf 'Source commit: `%s`\n\n' "$GITHUB_SHA" >> drop/BUILD_MATRIX_RETEST.md
+          printf '| Project | Version | Module | text | data | bss | total |\n|---|---|---|---:|---:|---:|---:|\n' >> drop/BUILD_MATRIX_RETEST.md
+
+          build_one() {
+            local name="$1"
+            local version="$2"
+            local source="$3"
+            local module="$4"
+            local template="$5"
+            local target="logue-sdk/platform/nutekt-digital/${name}"
+            cp -a "logue-sdk/platform/nutekt-digital/${template}" "$target"
+            cp "${source}/manifest.json" "$target/manifest.json"
+            cp "${source}/project.mk" "$target/project.mk"
+            mkdir -p "$target/src"
+            cp -a "${source}/src/." "$target/src/"
+            (
+              cd "$target"
+              make GCC_BIN_PATH=/usr/bin
+              make GCC_BIN_PATH=/usr/bin install
+            )
+            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${name}.elf" | tail -n 1)"
+            printf '| %s | %s | `%s` | %s | %s | %s | %s |\n' "$name" "$version" "$module" "$text" "$data" "$bss" "$dec" >> drop/BUILD_MATRIX_RETEST.md
+            cp "$target/${name}.ntkdigunit" drop/binaries/
+          }
+
+          build_one ironrot 0.2-1 effects/ironrot/nts1 modfx dummy-modfx
+          build_one nebula 0.1-1 effects/nebula/nts1 revfx dummy-revfx
+
+          cp effects/ironrot/docs/qa-m2.md drop/qa/ironrot-qa-m2.md
+          cp effects/nebula/docs/qa-sheet.md drop/qa/nebula-qa-hotfix.md
+
+          cat > drop/README.md <<'EOF'
+          # IRONROT + NEBULA hardware feedback retest
+
+          - **IRONROT 0.2-1**: stronger fracture/crossover texture plus attenuation-only slow envelope matching. Goal: CORROSION must sound more damaged without simply sounding louder.
+          - **NEBULA 0.1-1**: clipping hotfix with wet-path headroom, softer feedback-memory limiting, reduced input injection, and sub-unity wet output gain.
+
+          Both binaries require physical original NTS-1 MkI retesting. Use the included QA sheets.
+          EOF
+
+      - name: Upload feedback retest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: human-soon-feedback-retest
+          path: drop/
+          if-no-files-found: error
