@@ -71,9 +71,6 @@ static inline uint8_t normalized_to_cc7(float normalized) {
 
 static inline void receive_chord_code(uint8_t code) {
   s_last_received_code = code;
-
-  // HOLD (121) and reserved values (122..127) intentionally preserve the
-  // previous valid state. 120 explicitly enters harmonic bypass.
   chordghost::ChordState candidate = s_chord_state;
   if (chordghost::decode_chord_code(code, candidate)) {
     if (candidate.code != s_chord_state.code ||
@@ -84,17 +81,21 @@ static inline void receive_chord_code(uint8_t code) {
   }
 }
 
-static inline void reset_state() {
+static inline void clear_audio_state() {
   s_write_index = 0u;
   s_current_delay_samples = 12000.0f;
   s_target_delay_samples = 12000.0f;
+  for (uint32_t i = 0u; i < kDelayLineSize; ++i) s_delay_l[i] = s_delay_r[i] = 0.0f;
+}
+
+static inline void reset_state() {
   s_delay_multiplier = 1.0f;
   s_wet = 0.35f;
   s_dry = 0.65f;
   s_last_received_code = 0u;
   s_chord_generation = 0u;
   chordghost::decode_chord_code(0u, s_chord_state);
-  for (uint32_t i = 0u; i < kDelayLineSize; ++i) s_delay_l[i] = s_delay_r[i] = 0.0f;
+  clear_audio_state();
 }
 
 } // namespace
@@ -136,8 +137,14 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
   }
 }
 
-void DELFX_SUSPEND(void) { /* keep delay memory and harmonic state */ }
-void DELFX_RESUME(void) { /* no stale processor-local state to reset */ }
+void DELFX_SUSPEND(void) {
+  // Preserve the last valid chord state, but never resume with stale delay RAM.
+  clear_audio_state();
+}
+
+void DELFX_RESUME(void) {
+  clear_audio_state();
+}
 
 void DELFX_PARAM(uint8_t index, int32_t value) {
   const float normalized = clamp01(q31_to_f32(value));
