@@ -8,6 +8,13 @@ on:
       - 'effects/vectorfilter/**'
       - 'effects/ironrot/**'
       - 'effects/attractor/**'
+      - 'effects/zerocross/**'
+      - 'effects/phasewell/**'
+      - 'effects/ascender/**'
+      - 'effects/helix/**'
+      - 'effects/capstan/**'
+      - 'effects/sideband/**'
+      - 'effects/faultline/**'
       - '.github/workflows/build-modfx.yml'
   pull_request:
     paths:
@@ -16,6 +23,13 @@ on:
       - 'effects/vectorfilter/**'
       - 'effects/ironrot/**'
       - 'effects/attractor/**'
+      - 'effects/zerocross/**'
+      - 'effects/phasewell/**'
+      - 'effects/ascender/**'
+      - 'effects/helix/**'
+      - 'effects/capstan/**'
+      - 'effects/sideband/**'
+      - 'effects/faultline/**'
       - '.github/workflows/build-modfx.yml'
   workflow_dispatch:
 
@@ -26,16 +40,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: dust
-            source: effects/dust/nts1
-          - name: carrier
-            source: effects/carrier/nts1
-          - name: vectorfilter
-            source: effects/vectorfilter/nts1
-          - name: ironrot
-            source: effects/ironrot/nts1
-          - name: attractor
-            source: effects/attractor/nts1
+          - { name: dust, source: effects/dust/nts1 }
+          - { name: carrier, source: effects/carrier/nts1 }
+          - { name: vectorfilter, source: effects/vectorfilter/nts1 }
+          - { name: ironrot, source: effects/ironrot/nts1 }
+          - { name: attractor, source: effects/attractor/nts1 }
+          - { name: zerocross, source: effects/zerocross/nts1 }
+          - { name: phasewell, source: effects/phasewell/nts1 }
+          - { name: ascender, source: effects/ascender/nts1 }
+          - { name: helix, source: effects/helix/nts1 }
+          - { name: capstan, source: effects/capstan/nts1 }
+          - { name: sideband, source: effects/sideband/nts1 }
+          - { name: faultline, source: effects/faultline/nts1 }
 
     steps:
       - name: Checkout project
