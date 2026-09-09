@@ -1,0 +1,75 @@
+name: Build NTS-1 DelFX Suite
+
+on:
+  push:
+    paths:
+      - 'effects/ballistic/**'
+      - 'effects/rainfall/**'
+      - 'effects/swarmdelay/**'
+      - 'effects/glitchrepeat/**'
+      - 'effects/bucketline/**'
+      - 'effects/longmemory/**'
+      - 'effects/shard/**'
+      - '.github/workflows/build-delfx-suite.yml'
+  pull_request:
+    paths:
+      - 'effects/ballistic/**'
+      - 'effects/rainfall/**'
+      - 'effects/swarmdelay/**'
+      - 'effects/glitchrepeat/**'
+      - 'effects/bucketline/**'
+      - 'effects/longmemory/**'
+      - 'effects/shard/**'
+      - '.github/workflows/build-delfx-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: ballistic, source: effects/ballistic/nts1 }
+          - { name: rainfall, source: effects/rainfall/nts1 }
+          - { name: swarmdelay, source: effects/swarmdelay/nts1 }
+          - { name: glitchrepeat, source: effects/glitchrepeat/nts1 }
+          - { name: bucketline, source: effects/bucketline/nts1 }
+          - { name: longmemory, source: effects/longmemory/nts1 }
+          - { name: shard, source: effects/shard/nts1 }
+
+    steps:
+      - name: Checkout project
+        uses: actions/checkout@v4
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+      - name: Clone Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+      - name: Prepare ${{ matrix.name }} project
+        run: |
+          cp -a logue-sdk/platform/nutekt-digital/dummy-delfx logue-sdk/platform/nutekt-digital/${{ matrix.name }}
+          cp ${{ matrix.source }}/manifest.json logue-sdk/platform/nutekt-digital/${{ matrix.name }}/manifest.json
+          cp ${{ matrix.source }}/project.mk logue-sdk/platform/nutekt-digital/${{ matrix.name }}/project.mk
+          mkdir -p logue-sdk/platform/nutekt-digital/${{ matrix.name }}/src
+          cp -a ${{ matrix.source }}/src/. logue-sdk/platform/nutekt-digital/${{ matrix.name }}/src/
+      - name: Build ${{ matrix.name }}
+        run: |
+          cd logue-sdk/platform/nutekt-digital/${{ matrix.name }}
+          make GCC_BIN_PATH=/usr/bin
+          make GCC_BIN_PATH=/usr/bin install
+          arm-none-eabi-size build/${{ matrix.name }}.elf
+          ls -lh ${{ matrix.name }}.ntkdigunit
+      - name: Stage artifact
+        run: |
+          mkdir -p artifacts
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/${{ matrix.name }}.ntkdigunit artifacts/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/build/${{ matrix.name }}.map artifacts/
+          cp logue-sdk/platform/nutekt-digital/${{ matrix.name }}/build/${{ matrix.name }}.list artifacts/
+      - name: Upload build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}-nts1
+          path: artifacts/
+          if-no-files-found: error
