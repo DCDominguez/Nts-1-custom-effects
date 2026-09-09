@@ -10,8 +10,11 @@ static const uint32_t kBufferMask = kBufferSize - 1u;
 static const uint32_t kMaxVoices = 8u;
 static const float kParamSlew = 0.0015f;
 
-__sdram float s_buffer_l[kBufferSize];
-__sdram float s_buffer_r[kBufferSize];
+// MkI ModFX SDRAM is tight enough that a stereo 32768-sample history does not
+// fit. LATTICE CORE only needs one captured source stream: the voices create
+// stereo later through their independent pan positions. Keeping the history
+// mono preserves the full ~683 ms capture window while fitting the target.
+__sdram float s_buffer[kBufferSize];
 
 struct LoopVoice {
   uint32_t capture_start;
@@ -151,10 +154,7 @@ static void capture_voice(uint32_t i, uint32_t pattern) {
 }
 
 static void reset_state(void) {
-  for (uint32_t i = 0u; i < kBufferSize; ++i) {
-    s_buffer_l[i] = 0.0f;
-    s_buffer_r[i] = 0.0f;
-  }
+  for (uint32_t i = 0u; i < kBufferSize; ++i) s_buffer[i] = 0.0f;
   s_write = 0u;
   s_filled = 0u;
   s_event_counter = 0u;
@@ -190,8 +190,7 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
 
     const float in_l = main_xn[f * 2u];
     const float in_r = main_xn[f * 2u + 1u];
-    s_buffer_l[s_write] = in_l;
-    s_buffer_r[s_write] = in_r;
+    s_buffer[s_write] = 0.5f * (in_l + in_r);
     if (s_filled < kBufferSize) ++s_filled;
 
     const uint32_t active = active_voice_count(s_loops);
@@ -205,9 +204,7 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
         if (v.repeats_left == 0u) capture_voice(i, pattern);
 
         const float sample_pos = static_cast<float>(v.capture_start) + v.phase * static_cast<float>(v.loop_samples);
-        const float sl = read_frac(s_buffer_l, sample_pos);
-        const float sr = read_frac(s_buffer_r, sample_pos);
-        const float mono = 0.5f * (sl + sr);
+        const float mono = read_frac(s_buffer, sample_pos);
         const float env = grain_window(v.phase);
         float gl = 0.5f, gr = 0.5f;
         pan_gains(v.pan, gl, gr);
