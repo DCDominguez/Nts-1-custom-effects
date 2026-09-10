@@ -3,7 +3,7 @@
 **Project:** Human Soon Studio / NTS-1 Custom Effects  
 **Target hardware:** original Korg Nu:Tekt NTS-1 digital kit MkI  
 **Module target:** custom Delay (`delfx`)  
-**Status:** FIELD 0.1-0 implementation candidate; hardware validation OPEN
+**Status:** FIELD 0.1-1 implementation candidate; hardware validation OPEN
 **System role:** paired with LATTICE CORE in MOD; FIELD occupies DELAY. Optional Korg internal reverb may be used downstream.
 
 Read `LATTICE_HISTORY.md` before implementation. It records why these constraints exist.
@@ -687,3 +687,17 @@ This section makes the approved review proposals concrete. It supersedes illustr
 - **Testing baseline:** pair FIELD with unchanged CORE 0.3-0 first. The previously proposed CORE freeze corrections remain a separate versioned follow-up so FIELD's effect can be isolated.
 
 The first hardware package includes the exact project/SDK/toolchain identifiers, unit checksums, memory reports, desktop test result and hardware QA sheet. BUILD ONLY is not hardware acceptance.
+
+
+## 23. Approved 0.1-1 foreground level adjustment (2026-09-10)
+
+DC confirmed both note and delay were audible, but the delay was still quieter than desired following the higher-MIX check. The earlier inferred missing-trigger diagnosis was withdrawn. DC approved a focused +6 dB main-echo adjustment.
+
+- Multiply the four unison foreground answers by `1.995262315` after foreground overlap normalization and after the separate bloom-send calculation, before wet summing/protection.
+- Keep all six event levels inside the voices unchanged, so pitched ghost levels and bloom injection remain unchanged.
+- Keep capture/admission, CLOCK/MODE/MIX controls, phrase timing, absolute TTL, memory allocations and voice ceilings unchanged.
+- Preserve the existing .90 FS wet guard, .8*MIX final wet coefficient and emergency output clamp. Actual gain increase can be less than +6 dB on hot input. Shared protection can also reduce ghost/bloom output during guarded peaks; their pre-guard levels remain unchanged.
+- At noon MIX, the first main-answer coefficient becomes approximately .798 versus .5 dry, before pan, overlap and protection. This is not a perceived-loudness guarantee.
+- Retest the same hardware source at noon and 3 o'clock MIX. If hot input keeps the guard active enough to mask the requested level change, discuss the next step before altering protection or gain architecture.
+
+The temporary periodic-recapture proposal remains on hold. This version changes level only.

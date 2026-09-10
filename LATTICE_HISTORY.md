@@ -725,3 +725,10 @@ FIELD's first implementation uses six deterministic responses per seed and prese
 CORE is intentionally retained at 0.3-0 for the first A/B hardware comparison. The already identified freeze-release and full-freeze runtime corrections remain a separately versioned follow-up. Historical ECHO/SPACE binaries are not the preferred FIELD package.
 
 See `reports/lattice/2026-09-10_field-0.1-0-build.md` for actual test/build evidence and `LATTICE_FIELD_SPEC.md` section 22 for exact implementation constants. No new physical hardware result is claimed here.
+
+
+# 19. FIELD 0.1-1 — approved foreground level retest
+
+DC clarified that isolated and subsequent notes did produce audible delay, but it was faint and remained below the desired prominence following the higher-MIX check. Earlier assumptions of a missing trigger were superseded by that correction. The proposed capture redesign was put on hold.
+
+DC approved a focused +6 dB boost to the four main echoes, retaining pitched ghost levels, bloom sends and finite-phrase behavior. FIELD 0.1-1 applies this boost only in the clear foreground sum before existing wet protection. CORE remains 0.3-0. See the 0.1-1 build/result reports for test evidence. Hardware acceptance is still open.

@@ -1,7 +1,7 @@
 #include "userdelfx.h"
 #include <stdint.h>
 
-// FIELD 0.1-0: two owned captures, finite event tables, one shared bloom.
+// FIELD 0.1-1: +6 dB clear answers; capture, ghosts and bloom sends unchanged.
 // No allocation, moving delay heads, or wet-to-capture routing.
 namespace {
 const uint32_t SR = 48000u;
@@ -346,8 +346,11 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     bloom(sendL*sendNorm, sendR*sendNorm, bloomL, bloomR);
     // Lower bloom during the foreground, without ducking the dry source.
     bloomGain += ((fronts ? 0.38f : 0.72f)-bloomGain)*0.001f;
-    float wetL = frontL*foregroundNorm + ghostL*ghostNorm + bloomL*bloomGain;
-    float wetR = frontR*foregroundNorm + ghostR*ghostNorm + bloomR*bloomGain;
+    // Apply only after bloom sends: raising the clear answers must not drive
+    // the spatial network harder. Existing wet protection still bounds peaks.
+    const float foregroundGain = 1.995262315f; // +6 dB amplitude
+    float wetL = frontL*foregroundNorm*foregroundGain + ghostL*ghostNorm + bloomL*bloomGain;
+    float wetR = frontR*foregroundNorm*foregroundGain + ghostR*ghostNorm + bloomR*bloomGain;
     wetL = clean(wetL); wetR = clean(wetR);
     const float peak = maximum(absolute(wetL), absolute(wetR));
     const float desired = peak > 0.90f ? 0.90f / peak : 1.0f;
@@ -358,7 +361,7 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
 #endif
     } else wetGuard += (desired-wetGuard)*0.0004f;
     mixValue += (mixTarget-mixValue)*0.0015f;
-    // Mid MIX: dry .5, main answer .4 before pan; high MIX reaches wet-only.
+    // Mid MIX: dry .5, main answer ~.798 before pan/guard; max is wet-only.
     const float dry = 1.0f-mixValue, wet = 0.8f*mixValue*wetGuard;
     xn[2u*f] = clamp(inL*dry + wetL*wet, -1.0f, 1.0f);
     xn[2u*f+1u] = clamp(inR*dry + wetR*wet, -1.0f, 1.0f);
