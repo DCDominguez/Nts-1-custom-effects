@@ -7,13 +7,10 @@ namespace {
 static const float kSampleRate = 48000.0f;
 static const uint32_t kFragmentSlots = 4u;
 static const uint32_t kFragmentSize = 4096u;
-static const uint32_t kPlaybackVoices = 24u;
+static const uint32_t kPlaybackVoices = 16u;
 static const float kParamSlew = 0.0015f;
+static const float kGuardCeiling = 0.86f;
 
-// ECHO 0.2 is an event/playback engine rather than a continuously moving
-// multi-tap delay. Four short captured fragments are clocked through a pool of
-// playback voices. Moving CLOCK or MODE only affects future events, so turning
-// the knobs cannot drag live delay heads through memory.
 __sdram float s_fragment[kFragmentSlots][kFragmentSize];
 
 struct FragmentSlot {
@@ -25,6 +22,7 @@ struct FragmentSlot {
 struct PlaybackVoice {
   uint32_t slot;
   uint32_t remaining;
+  uint32_t total;
   uint32_t delay_remaining;
   float position;
   float increment;
@@ -46,12 +44,14 @@ static uint32_t s_tick_samples = 12000u;
 static uint32_t s_tick_counter = 0u;
 static uint32_t s_refractory = 0u;
 static uint32_t s_since_capture = 0u;
+static uint32_t s_voice_limit = 12u;
 static bool s_capturing = false;
 
 static float s_fast_env = 0.0f;
 static float s_slow_env = 0.0f;
 static float s_wet_lp_l = 0.0f;
 static float s_wet_lp_r = 0.0f;
+static float s_guard_gain = 1.0f;
 
 static float s_clock_target = 0.50f;
 static float s_mode_target = 0.10f;
@@ -63,7 +63,16 @@ static float s_mix = 0.40f;
 static uint32_t s_clock_latched = 4u;
 static uint32_t s_mode_latched = 0u;
 
+static const float kWetNorm[kPlaybackVoices + 1u] = {
+  0.000f,
+  1.000f, 0.840f, 0.735f, 0.665f,
+  0.610f, 0.570f, 0.535f, 0.505f,
+  0.480f, 0.458f, 0.438f, 0.420f,
+  0.404f, 0.389f, 0.376f, 0.364f
+};
+
 static inline float absf(float x) { return x < 0.0f ? -x : x; }
+static inline float maxf(float a, float b) { return a > b ? a : b; }
 
 static inline float clamp01(float x) {
   if (x < 0.0f) return 0.0f;
@@ -73,10 +82,24 @@ static inline float clamp01(float x) {
 
 static inline float soft_limit(float x) {
   const float ax = absf(x);
-  if (ax <= 0.88f) return x;
-  float y = 0.88f + (ax - 0.88f) / (1.0f + 3.5f * (ax - 0.88f));
+  if (ax <= 0.94f) return x;
+  const float over = ax - 0.94f;
+  float y = 0.94f + over / (1.0f + 6.0f * over);
   if (y > 0.995f) y = 0.995f;
   return x < 0.0f ? -y : y;
+}
+
+static inline void guard_pair(float &l, float &r) {
+  const float peak = maxf(absf(l), absf(r));
+  if (peak > kGuardCeiling) {
+    const float needed = kGuardCeiling / peak;
+    if (needed < s_guard_gain) s_guard_gain = needed;
+  } else {
+    s_guard_gain += (1.0f - s_guard_gain) * 0.00032f;
+    if (s_guard_gain > 1.0f) s_guard_gain = 1.0f;
+  }
+  l *= s_guard_gain;
+  r *= s_guard_gain;
 }
 
 static inline uint32_t clock_index(float value) {
@@ -92,13 +115,19 @@ static inline uint32_t mode_index(float value) {
 }
 
 static inline float division_beats(uint32_t i) {
-  // Quarter-note beat units:
-  // 1/32, 1/16T, 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2.
+  // Quarter-note beat units: 1/32, 1/16T, 1/16, 1/8T, 1/8, 1/4T, 1/4, 1/2.
   static const float kBeats[8] = {
     0.125f, 0.16666667f, 0.25f, 0.33333333f,
     0.50f, 0.66666667f, 1.0f, 2.0f
   };
   return kBeats[i & 7u];
+}
+
+static inline uint32_t voice_limit_for_clock(uint32_t division, uint32_t mode) {
+  static const uint8_t kLimit[8] = { 8u, 9u, 10u, 11u, 12u, 14u, 16u, 16u };
+  uint32_t n = kLimit[division & 7u];
+  if (mode == 3u && n > 10u) n = 10u; // STUTTER gets a stricter burst budget.
+  return n;
 }
 
 static inline uint32_t samples_for_clock(uint32_t division) {
@@ -112,7 +141,7 @@ static inline uint32_t samples_for_clock(uint32_t division) {
 
 static inline uint32_t capture_length_for_tick(uint32_t tick) {
   uint32_t n = tick / 3u;
-  if (n < 768u) n = 768u;
+  if (n < 896u) n = 896u;
   if (n > kFragmentSize) n = kFragmentSize;
   return n;
 }
@@ -133,27 +162,26 @@ static void finish_capture(void) {
   slot.length = s_capture_pos;
   if (slot.length < 64u) slot.length = 64u;
   if (slot.length > kFragmentSize) slot.length = kFragmentSize;
-  slot.generations_left = 12u;
+  slot.generations_left = 16u;
   slot.valid = true;
   s_last_completed_slot = s_capture_slot;
   s_capturing = false;
-  s_refractory = static_cast<uint32_t>(kSampleRate * 0.10f);
+  s_refractory = static_cast<uint32_t>(kSampleRate * 0.085f);
 }
 
 static PlaybackVoice *free_voice(void) {
-  for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
+  for (uint32_t i = 0u; i < s_voice_limit; ++i) {
     if (!s_voice[i].active) return &s_voice[i];
   }
-  // If the cloud is completely full, recycle the quietest/oldest tail slot
-  // deterministically rather than failing or growing an unstable feedback sum.
-  return &s_voice[s_tick_counter % kPlaybackVoices];
+  // Full pool: replace one existing tail. This prevents uncontrolled accumulation.
+  return &s_voice[s_tick_counter % s_voice_limit];
 }
 
 static void spawn_voice(uint32_t slot_index, bool reverse,
                         uint32_t delay_samples, float pan, float level,
                         uint32_t length_override) {
   FragmentSlot &slot = s_slot[slot_index];
-  if (!slot.valid || slot.length < 64u) return;
+  if (!slot.valid || slot.length < 64u || s_voice_limit == 0u) return;
 
   PlaybackVoice *v = free_voice();
   uint32_t length = length_override;
@@ -162,6 +190,7 @@ static void spawn_voice(uint32_t slot_index, bool reverse,
 
   v->slot = slot_index;
   v->remaining = length;
+  v->total = length;
   v->delay_remaining = delay_samples;
   v->increment = reverse ? -1.0f : 1.0f;
   v->position = reverse ? static_cast<float>(length - 1u) : 0.0f;
@@ -174,9 +203,9 @@ static void spawn_voice(uint32_t slot_index, bool reverse,
 }
 
 static void schedule_regular_tick(uint32_t mode) {
-  static const float kOffset[4] = { 0.0f, 0.21f, 0.48f, 0.73f };
-  static const float kLevel[4]  = { 0.72f, 0.53f, 0.39f, 0.29f };
-  static const float kPan[4]    = { -0.72f, 0.64f, -0.34f, 0.86f };
+  static const float kOffset[4] = { 0.0f, 0.19f, 0.46f, 0.76f };
+  static const float kLevel[4]  = { 1.00f, 0.78f, 0.61f, 0.47f };
+  static const float kPan[4]    = { -0.78f, 0.71f, -0.38f, 0.89f };
 
   const bool reverse = (mode == 1u);
   const bool pingpong = (mode == 2u);
@@ -189,8 +218,8 @@ static void schedule_regular_tick(uint32_t mode) {
     float pan = kPan[age];
     if (pingpong) {
       const bool right = ((s_tick_counter + age) & 1u) != 0u;
-      pan = right ? (0.58f + 0.10f * static_cast<float>(age))
-                  : (-0.58f - 0.10f * static_cast<float>(age));
+      pan = right ? (0.60f + 0.10f * static_cast<float>(age))
+                  : (-0.60f - 0.10f * static_cast<float>(age));
     }
 
     spawn_voice(slot_index, reverse,
@@ -207,14 +236,15 @@ static void schedule_stutter_tick(void) {
   if (!slot.valid || slot.generations_left == 0u) return;
 
   uint32_t slice = s_tick_samples / 8u;
-  if (slice < 192u) slice = 192u;
-  if (slice > 1536u) slice = 1536u;
+  if (slice < 224u) slice = 224u;
+  if (slice > 1664u) slice = 1664u;
   if (slice > slot.length) slice = slot.length;
 
+  // Six retriggers are enough to read as a stutter without exhausting the pool.
   for (uint32_t i = 0u; i < 6u; ++i) {
     const uint32_t offset = (s_tick_samples * i) / 6u;
-    const float pan = (i & 1u) ? 0.55f : -0.55f;
-    const float level = 0.62f - 0.055f * static_cast<float>(i);
+    const float pan = (i & 1u) ? 0.66f : -0.66f;
+    const float level = 0.92f - 0.075f * static_cast<float>(i);
     spawn_voice(s_last_completed_slot, false, offset, pan, level, slice);
   }
 
@@ -226,6 +256,7 @@ static void schedule_tick(void) {
   s_clock_latched = clock_index(s_clock);
   s_mode_latched = mode_index(s_mode);
   s_tick_samples = samples_for_clock(s_clock_latched);
+  s_voice_limit = voice_limit_for_clock(s_clock_latched, s_mode_latched);
 
   if (s_mode_latched == 3u) schedule_stutter_tick();
   else schedule_regular_tick(s_mode_latched);
@@ -243,6 +274,7 @@ static void reset_state(void) {
   for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
     s_voice[i].slot = 0u;
     s_voice[i].remaining = 0u;
+    s_voice[i].total = 0u;
     s_voice[i].delay_remaining = 0u;
     s_voice[i].position = 0.0f;
     s_voice[i].increment = 1.0f;
@@ -261,9 +293,11 @@ static void reset_state(void) {
   s_tick_counter = 0u;
   s_refractory = 0u;
   s_since_capture = 0u;
+  s_voice_limit = 12u;
   s_capturing = false;
   s_fast_env = s_slow_env = 0.0f;
   s_wet_lp_l = s_wet_lp_r = 0.0f;
+  s_guard_gain = 1.0f;
 
   s_clock_target = s_clock = 0.50f;
   s_mode_target = s_mode = 0.10f;
@@ -297,11 +331,11 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     ++s_since_capture;
 
     const bool onset = !s_capturing && s_refractory == 0u &&
-                       s_fast_env > (s_slow_env * 1.50f + 0.006f) &&
-                       s_fast_env > 0.010f;
+                       s_fast_env > (s_slow_env * 1.46f + 0.0045f) &&
+                       s_fast_env > 0.008f;
     const bool fallback_capture = !s_capturing && s_refractory == 0u &&
-                                  s_since_capture > static_cast<uint32_t>(kSampleRate * 0.70f) &&
-                                  s_fast_env > 0.012f;
+                                  s_since_capture > static_cast<uint32_t>(kSampleRate * 0.58f) &&
+                                  s_fast_env > 0.009f;
     if (onset || fallback_capture) begin_capture();
 
     if (s_capturing) {
@@ -318,8 +352,9 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
 
     float wet_l = 0.0f;
     float wet_r = 0.0f;
+    uint32_t sounding = 0u;
 
-    for (uint32_t i = 0u; i < kPlaybackVoices; ++i) {
+    for (uint32_t i = 0u; i < s_voice_limit; ++i) {
       PlaybackVoice &v = s_voice[i];
       if (!v.active) continue;
       if (v.delay_remaining > 0u) {
@@ -338,28 +373,37 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
       if (index >= static_cast<int32_t>(slot.length)) index = static_cast<int32_t>(slot.length - 1u);
       const float sample = s_fragment[v.slot][static_cast<uint32_t>(index)];
 
-      // A simple triangular edge window keeps each scheduled fragment clean.
-      const uint32_t played = slot.length > v.remaining ? (slot.length - v.remaining) : 0u;
+      const uint32_t played = v.total > v.remaining ? (v.total - v.remaining) : 0u;
       float env = 1.0f;
-      if (played < 64u) env = static_cast<float>(played) * (1.0f / 64.0f);
-      if (v.remaining < 64u) env *= static_cast<float>(v.remaining) * (1.0f / 64.0f);
+      if (played < 72u) env = static_cast<float>(played) * (1.0f / 72.0f);
+      if (v.remaining < 72u) env *= static_cast<float>(v.remaining) * (1.0f / 72.0f);
 
       wet_l += sample * env * v.level * v.gain_l;
       wet_r += sample * env * v.level * v.gain_r;
+      ++sounding;
 
       v.position += v.increment;
       --v.remaining;
       if (v.remaining == 0u) v.active = false;
     }
 
-    // Fixed gentle darkening keeps repeated fragments from becoming brittle.
-    s_wet_lp_l += (wet_l - s_wet_lp_l) * 0.34f;
-    s_wet_lp_r += (wet_r - s_wet_lp_r) * 0.34f;
+    // A small amount of darkening keeps dense repeats smooth without hiding them.
+    s_wet_lp_l += (wet_l - s_wet_lp_l) * 0.42f;
+    s_wet_lp_r += (wet_r - s_wet_lp_r) * 0.42f;
 
-    const float dry_gain = 1.0f - 0.18f * s_mix;
-    const float wet_gain = (0.38f + 0.72f * s_mix) * s_mix;
-    xn[f * 2u] = soft_limit(in_l * dry_gain + s_wet_lp_l * wet_gain);
-    xn[f * 2u + 1u] = soft_limit(in_r * dry_gain + s_wet_lp_r * wet_gain);
+    if (sounding > kPlaybackVoices) sounding = kPlaybackVoices;
+    const float norm = sounding > 0u ? kWetNorm[sounding] : 1.0f;
+
+    // 0.3 deliberately makes ECHO obvious. At full MIX the dry spine retreats
+    // while the scheduled fragment field can dominate; the peak guard, rather
+    // than a timid wet gain, prevents chain collapse.
+    const float dry_gain = 1.0f - 0.65f * s_mix;
+    const float wet_gain = (0.62f + 0.68f * s_mix) * s_mix;
+    float out_l = in_l * dry_gain + s_wet_lp_l * wet_gain * norm;
+    float out_r = in_r * dry_gain + s_wet_lp_r * wet_gain * norm;
+    guard_pair(out_l, out_r);
+    xn[f * 2u] = soft_limit(out_l);
+    xn[f * 2u + 1u] = soft_limit(out_r);
   }
 }
 
