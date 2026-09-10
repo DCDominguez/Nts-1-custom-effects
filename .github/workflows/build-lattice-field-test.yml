@@ -1,0 +1,84 @@
+name: Build LATTICE FIELD 0.1 Test
+on:
+  push:
+    branches: [field-0.1-0-test, lattice-suite]
+    paths:
+      - 'effects/lattice-field/**'
+      - 'tests/lattice-field/**'
+      - '.github/workflows/build-lattice-field-test.yml'
+      - 'LATTICE_FIELD_SPEC.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-and-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run actual FIELD DSP with address and undefined-behavior checks
+        run: |
+          mkdir -p artifacts
+          g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I tests/lattice-field/stubs tests/lattice-field/test.cpp -o /tmp/field-test
+          /tmp/field-test | tee artifacts/HOST-TESTS.txt
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+      - name: Fetch reviewed current Korg SDK
+        uses: actions/checkout@v4
+        with:
+          repository: korginc/logue-sdk
+          ref: f6f073bb83d5ef69310fca609c41ddcf722dd558
+          path: logue-sdk
+          submodules: recursive
+      - name: Build FIELD and unchanged CORE reference
+        shell: bash
+        run: |
+          set -euo pipefail
+          for unit in field core; do
+            template=dummy-delfx
+            if [ "$unit" = core ]; then template=dummy-modfx; fi
+            project="lattice_$unit"
+            source="effects/lattice-$unit/nts1"
+            target="logue-sdk/platform/nutekt-digital/$project"
+            cp -a "logue-sdk/platform/nutekt-digital/$template" "$target"
+            cp "$source/manifest.json" "$source/project.mk" "$target/"
+            mkdir -p "$target/src"
+            cp -a "$source/src/." "$target/src/"
+            make -C "$target" GCC_BIN_PATH=/usr/bin
+            make -C "$target" GCC_BIN_PATH=/usr/bin install
+            mkdir -p "artifacts/$unit"
+            cp "$target/$project.ntkdigunit" "artifacts/$unit/"
+            cp "$target/build/$project.map" "artifacts/$unit/"
+            arm-none-eabi-size -A "$target/build/$project.elf" > "artifacts/$unit/MEMORY.txt"
+          done
+      - name: Verify binaries and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import zipfile, pathlib
+          for p in pathlib.Path('artifacts').rglob('*.ntkdigunit'):
+              with zipfile.ZipFile(p) as z:
+                  assert z.testzip() is None
+                  assert z.namelist()
+              print('Verified unit ZIP:', p)
+          PY
+          cp effects/lattice-field/README.md artifacts/FIELD-README.md
+          cp effects/lattice-field/docs/qa-0.1-0.md artifacts/START-HERE-HARDWARE-QA.md
+          cp LATTICE_FIELD_SPEC.md artifacts/
+          cp reports/lattice/2026-09-10_field-0.1-0-build.md artifacts/
+          {
+            echo "Project commit: $GITHUB_SHA"
+            echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Korg SDK: $(git -C logue-sdk rev-parse HEAD)"
+            arm-none-eabi-gcc --version | head -1
+            echo "FIELD 0.1-0; CORE 0.3-0 unchanged; HARDWARE NOT VALIDATED"
+          } > artifacts/BUILD-PROVENANCE.txt
+          (cd artifacts && sha256sum field/*.ntkdigunit core/*.ntkdigunit > SHA256SUMS.txt)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LATTICE-FIELD-0.1-0-Hardware-Test
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30

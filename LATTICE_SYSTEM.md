@@ -54,7 +54,7 @@ CORE owns **composition**.
 
 ### FIELD — response / memory / atmosphere
 
-Current status: **specification stage**.
+Current status: **FIELD 0.1-0 implementation candidate; hardware validation OPEN**.
 
 Module target: custom Delay (`delfx`).
 
@@ -177,7 +177,7 @@ LATTICE therefore does not assume that successful light triple-custom operation 
 
 ## Current next milestone
 
-Implement FIELD from `LATTICE_FIELD_SPEC.md`, then physically establish:
+Build and physically test FIELD 0.1-0 against unchanged CORE 0.3-0, then establish:
 
 - obvious intentional response at middle MIX;
 - finite phrase lifetime with no endless distinct repeats;

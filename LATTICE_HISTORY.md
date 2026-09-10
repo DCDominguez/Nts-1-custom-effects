@@ -714,3 +714,14 @@ The next FIELD build does not pass until physical MkI testing confirms:
 # 17. Short context for future agents
 
 > LATTICE started as three heavy custom processors: CORE composed microloops, ECHO multiplied them, and CLOUD/SPACE turned them into atmosphere. Physical MkI testing repeatedly showed that each stage could work alone or in pairs, but all three together were too difficult to keep stable under aggressive settings. Earlier builds also exposed subtler failures: CORE's 32 simultaneous voices collapsed into a steady tone, ECHO was initially too subtle and could behave as though it repeated forever, and the separate reverb did not consistently own the space. The architecture therefore pivoted to **CORE + FIELD**. CORE remains a 16-voice microloop composer/looper. FIELD will be a finite two-seed clocked phrase engine that gives loud, recognizable answers, uses sparse structured pitch ghosts, and progressively sends later events into a fat ethereal bloom. FIELD must never self-recapture, must have event-count and absolute-TTL kill mechanisms, must keep the dry source intelligible, and must prioritize high-quality audio over maximum event count. The design target is not random cloud generation; it is **statement → response → memory → atmosphere → silence**.
+
+
+# 18. FIELD 0.1-0 implementation cycle — 2026-09-10
+
+DC approved the repository review's six proposals: explicit phrase admission, separate event/voice budgets (8 normal/4 fastest), protected capture ownership, foreground-first level budgets, immutable expiry, and one shared BODY/HALO bloom. DC requested a pause before adopting any newly discovered improvement beyond that approved scope.
+
+FIELD's first implementation uses six deterministic responses per seed and preserves stereo capture. Fresh attacks or release/rearm admit input; the old timed sustained-input fallback is absent. CLOCK/MODE/tempo latch per seed; expiry cannot grow with a knob change. Retiring reads drain before capture storage can be reused. The raw incoming signal here includes CORE's output, so an upstream frozen loop may qualify as new input repeatedly.
+
+CORE is intentionally retained at 0.3-0 for the first A/B hardware comparison. The already identified freeze-release and full-freeze runtime corrections remain a separately versioned follow-up. Historical ECHO/SPACE binaries are not the preferred FIELD package.
+
+See `reports/lattice/2026-09-10_field-0.1-0-build.md` for actual test/build evidence and `LATTICE_FIELD_SPEC.md` section 22 for exact implementation constants. No new physical hardware result is claimed here.

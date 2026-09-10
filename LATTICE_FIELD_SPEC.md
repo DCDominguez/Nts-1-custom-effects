@@ -3,7 +3,7 @@
 **Project:** Human Soon Studio / NTS-1 Custom Effects  
 **Target hardware:** original Korg Nu:Tekt NTS-1 digital kit MkI  
 **Module target:** custom Delay (`delfx`)  
-**Status:** design specification v2 — pre-implementation  
+**Status:** FIELD 0.1-0 implementation candidate; hardware validation OPEN
 **System role:** paired with LATTICE CORE in MOD; FIELD occupies DELAY. Optional Korg internal reverb may be used downstream.
 
 Read `LATTICE_HISTORY.md` before implementation. It records why these constraints exist.
@@ -551,8 +551,8 @@ FIELD replaces simultaneous standalone LATTICE ECHO + LATTICE SPACE in the prefe
 Target limits:
 
 - **2 active seed captures**
-- approximately **8–12 meaningful playback voices/events** at normal/slow clocks
-- lower live voice ceiling at fastest subdivisions
+- **8 sounding playback voices maximum**, with six scheduled responses per seed
+- **4 sounding voices** for newly admitted seeds at the fastest two subdivisions; existing voices always drain normally
 - one compact bloom network shared by all events
 - no separate reverb onset detector
 - no continuously moving multi-tap bank
@@ -664,3 +664,26 @@ Priority:
 ## 21. Design principle
 
 > **LATTICE FIELD should not sound like a delay with reverb attached. It should sound like the machine heard a phrase, answered it deliberately, and then let the answer evaporate into space.**
+
+
+## 22. Approved 0.1-0 implementation contract (2026-09-10)
+
+This section makes the approved review proposals concrete. It supersedes illustrative tables where they differ. The product identity and hardware gates above remain mandatory.
+
+- **Admission:** incoming stereo energy only; 120 ms refractory interval, transient hysteresis or a release/rearm (20 ms below the lower energy threshold). No periodic sustained-input fallback. A fresh attack can qualify while another source sustains. These thresholds require physical source-level calibration.
+- **Upstream distinction:** FIELD sees CORE's output. A CORE freeze with recurring attacks can continue qualifying as input. Finite/rest guarantees apply after qualifying FIELD input ends; they do not promise silence while upstream CORE keeps generating new attacks.
+- **Capture:** two owned stereo float captures, 4096 samples/channel each (up to 85.3 ms at 48 kHz). A 512-frame stereo history supplies a fixed 256-frame preroll. Capture length is half a tick, clamped to 1024–4096 frames. No wet signal enters either buffer. On replacement, the oldest seed retires over 96 samples before its storage is reused; identity checks reject stale voices.
+- **Phrase:** six responses, levels 1.00 / .78 / .61 / .46 / .14 / .09. First four are unison; last two are +7 / +12 semitone ghosts. No extra random events in this first controlled comparison.
+- **Timing:** event times in CLOCK ticks are Forward/Ping-Pong `[1,2,3,4,6,8]`, Reverse `[1,3,4,6,7,8]`, Stutter `[1,1.25,1.5,2,3,4]`, measured after nominal capture completion. Reverse plays backward; Ping-Pong alternates structural stereo balance; Stutter shortens slices. Original stereo is retained in foreground playback.
+- **Control latching:** CLOCK, MODE and host BPM snapshot at seed admission. MIX is smoothed continuously. Clock division index and host tempo do not imply transport/beat-phase synchronization; the phrase is tempo-relative from its own capture.
+- **TTL:** each seed's immutable sample deadline is admission + `10*tick + 4096` frames, independent of event-count completion. A waiting foreground event never extends this deadline. Counter comparisons handle uint32 sample-clock wrap for these bounded intervals.
+- **Capacity:** eight physical voice slots, four-admission ceiling at the fastest two CLOCK subdivisions. Every allocated slot is serviced, even after a budget change. Ghosts are omitted when full. Foreground admission fades a ghost/quiet tail over 96 frames and waits for room; this may shift that event by about 2 ms. Transitioning from an older slow phrase to a fast phrase drains the old voices instead of cutting them off.
+- **Pitch:** linear interpolation, 96-frame edges and darker low-level pitched ghosts. This is playback-rate transposition, not independent time stretching. Physical aliasing/quality gates remain OPEN.
+- **Hierarchy:** foreground and ghosts have separate smoothed overlap normalization. Bloom sends are independently normalized. No gain is added to replace an omitted event.
+- **Bloom:** one shared four-line FDN (1493/2111/2971/3797 samples), two short allpasses, DC rejection, damping and .82 feedback. BODY and quieter HALO are outputs of this network, not separate reverb engines. All audible events send to bloom, using .18/.30/.48/.72/1.10/1.35 stage send weights. Smoothed bloom level is lower during foreground answers. No direct-input room feed in 0.1-0.
+- **Rest:** with no sounding voice, bloom decays naturally; a final 6–8 second envelope guarantees inaudible output by 8 seconds after the last voice. Storage clears incrementally thereafter (at most another 4096 frames), avoiding a large audio-callback clear. Host tests require output below 1e-6 FS at final rest. New qualifying input resets that bloom timer.
+- **Mix:** dry gain `1-MIX`, wet gain `.8*MIX`, with a stereo-linked wet peak guard at .90 FS and an emergency final clamp at +/-1. Mid-MIX first-answer design ratio is approximately .8 of dry before stereo balance; prominence remains a listening criterion. Near-dry transparency applies to valid normalized source input.
+- **Memory:** declared audio arrays total 139,264 bytes (136 KiB) in SDRAM. Linker results separately establish executable/state SRAM use. Desktop tests do not establish MkI CPU margin.
+- **Testing baseline:** pair FIELD with unchanged CORE 0.3-0 first. The previously proposed CORE freeze corrections remain a separate versioned follow-up so FIELD's effect can be isolated.
+
+The first hardware package includes the exact project/SDK/toolchain identifiers, unit checksums, memory reports, desktop test result and hardware QA sheet. BUILD ONLY is not hardware acceptance.
