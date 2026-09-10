@@ -2,92 +2,179 @@
 
 Target: **original Korg Nu:Tekt NTS-1 digital kit MkI**.
 
-LATTICE is a three-stage generative effects system designed around one musical behavior: **a simple incoming tone should become a melodic fragment field, then a clocked playback swarm, then a space around that swarm.**
+LATTICE is a generative phrase-and-space system built around one musical behavior:
+
+> **a simple incoming sound should become a deliberate musical response, then memory, then atmosphere — without losing source clarity or collapsing the MkI runtime.**
+
+## Read these first
+
+Before changing LATTICE DSP:
+
+1. **`LATTICE_HISTORY.md`** — complete project history, physical hardware findings, failed architectures, and engineering lessons.
+2. **`LATTICE_FIELD_SPEC.md`** — current next-build specification and hard guardrails.
+3. **Issue #9** — raw physical MkI QA notes and open hardware gates.
+
+Commit history records what changed. `LATTICE_HISTORY.md` records why.
+
+---
+
+## Current preferred MkI architecture
+
+The original three-custom-unit architecture has been retired as the preferred system target after physical MkI load-balance testing.
 
 ```text
-AUDIO IN
-   |
-   v
-LATTICE CORE   (custom modfx)
- composition: rotating microloop ecosystem + interval rules
-   |
-   v
-LATTICE ECHO   (custom delfx)
- multiplication: clocked fragment playback modes
-   |
-   v
-LATTICE SPACE  (custom revfx)
- environment: dark drifting stereo reverb
+AUDIO IN / OSC
+      ↓
+LATTICE CORE   [custom MOD]
+composition + microloops + performance loop/freeze
+      ↓
+LATTICE FIELD  [custom DELAY]
+finite clocked phrase response + pitch/stereo ghosts + spatial bloom
+      ↓
+optional Korg internal REVERB
+      ↓
+OUTPUT
 ```
+
+### CORE — composer / looper
+
+Current implemented version: **0.3-0**.
+
+Role:
+
+- creates microloop composition from recent audio;
+- uses structured pitch rules plus rhythm/spacing/stereo variation;
+- uses 16 total microloop voices rather than the previous 32-voice stress design;
+- low TIME includes a disengaged region;
+- maximum TIME becomes a recent-audio loop/freeze rather than maximum simultaneous density.
+
+CORE owns **composition**.
+
+### FIELD — response / memory / atmosphere
+
+Current status: **specification stage**.
+
+Module target: custom Delay (`delfx`).
+
+Controls:
+
+- DELAY A / TIME = **CLOCK**
+- DELAY B / DEPTH = **PLAYBACK MODE**
+- DELAY + B / MIX = **MIX**
+
+Playback modes:
+
+1. FORWARD
+2. REVERSE
+3. PING-PONG
+4. STUTTER
+
+FIELD owns **response, multiplication, memory, and spatial dissolution**.
+
+Its core behavior is:
+
+```text
+clear fragment
+   ↓
+strong deliberate answer
+   ↓
+stereo / pitched responses
+   ↓
+ghosts
+   ↓
+fat ethereal bloom
+   ↓
+silence
+```
+
+FIELD must use finite seed phrases rather than an endless feedback delay. The spatial bloom is fed by playback events themselves and does not rely on a separate onset detector.
+
+See `LATTICE_FIELD_SPEC.md` for implementation requirements.
+
+---
+
+## Historical standalone units
+
+The following remain in the repository and may still be useful independently:
+
+- **LATTICE ECHO 0.3-0** — standalone clocked custom Delay experiment.
+- **LATTICE SPACE 0.3-0** — standalone spatial custom Reverb experiment.
+
+They are no longer the preferred way to assemble the full MkI LATTICE system.
+
+The reason is physical hardware behavior, not compile failure: CORE + ECHO + SPACE can each run, and pairwise combinations are substantially more usable, but aggressive three-unit use repeatedly crossed into distortion/collapse on the target MkI.
+
+---
+
+## Non-negotiable system doctrine
+
+### Hardware truth
+
+- Compile/CI success is not physical validation.
+- Only physical original-MkI testing closes hardware gates.
+- Record only observed hardware behavior; do not invent tester telemetry.
+
+### Intentionality
+
+- Randomize geometry more readily than harmony.
+- Prefer recognizable phrase grammar over unrelated stochastic events.
+- More activity should mean more musical behavior, not merely more gain or more simultaneous DSP.
+
+### Audibility
+
+- The main effect identity must be obvious around useful middle settings.
+- First-order foreground events must not become inaudible simply to make room for more ghosts.
+- When overloaded, remove low-priority events before sacrificing the main response.
+
+### Source clarity and sound quality
+
+- Preserve a separate dry/source spine until final summing.
+- No avoidable clicks, zippering, DC buildup, runaway resonance, unintended mono collapse, limiter pumping, or cheap pitch artifacts.
+- “Experimental” is not permission for degraded audio quality.
+
+### Finite behavior
+
+- FIELD phrases must expire.
+- No wet self-recapture.
+- Use both event-count and absolute-TTL termination.
+- The system must always return to a real rest state.
+
+### Runtime/headroom
+
+- Perceived density does not need to equal simultaneous voice count.
+- Schedule work at event boundaries where possible.
+- Preserve runtime margin for CORE + FIELD together.
+- Peak guards are containment, not a substitute for correct gain structure.
+
+---
 
 ## Clean-room inspiration
 
-The high-level reference is the musical behavior described in public Hologram Electronics Microcosm documentation: short repeated samples, multiple loopers, playback-speed relationships, clocked/rearranged material, delay, granular textures and a separate stereo reverb. LATTICE does not copy Microcosm algorithms, firmware, presets, UI, names or reverse-engineered behavior. The scheduler, interval rules, playback modes, stereo layout and reverb network here are original.
+The high-level reference remains musical behavior described in public Hologram Electronics Microcosm documentation: short repeated samples, multiple playback speeds, clocked/rearranged material, delay, looping, pitch movement, and spatial processing.
 
-## 0.2 architecture
+LATTICE does not copy Microcosm algorithms, firmware, presets, UI, branding, or reverse-engineered behavior. The scheduler, phrase grammars, interval rules, stereo layout, capture logic, and bloom network are original.
 
-### CORE — composer (`modfx`)
-- TIME = **ACTIVITY**
-- DEPTH = **PATTERN**
-- 32 loop states remain available as a population.
-- Only up to 16 are audible at once.
-- Higher ACTIVITY increasingly randomizes capture age, loop length, entry wait, lifetime and stereo zone.
-- Voices outside the foreground rotate in and out instead of accumulating permanently.
-- PATTERN remains deterministic/musical; randomness changes geometry, not the harmonic rule.
-- Output uses density-aware normalization plus a gentle soft limiter rather than the previous hard clamp.
+---
 
-### ECHO — clocked playback engine (`delfx`)
-- TIME = **CLOCK**
-- DEPTH = **PLAYBACK MODE**
-- SHIFT+DEPTH = **MIX**
+## Hardware/documentation context
 
-CLOCK divisions, low to high:
-1. 1/32
-2. 1/16T
-3. 1/16
-4. 1/8T
-5. 1/8
-6. 1/4T
-7. 1/4
-8. 1/2
+The project owner's physical original NTS-1 MkI reports firmware `N1.2` / v1.20 and panel `P1.0`. That device has audibly run custom ModFX + custom DelFX + custom RevFX together, including explicit BALLISTIC + ABYSS verification on fresh external audio.
 
-PLAYBACK MODE, low to high:
-1. **FORWARD**
-2. **REVERSE**
-3. **PING-PONG**
-4. **STUTTER**
+Korg's public first-generation SDK documentation nevertheless describes custom Delay and Reverb as sharing a runtime and ordinarily supports only one of those custom processor types at a time when both slots are enabled.
 
-ECHO captures short recent fragments into four slots, then schedules them on the host BPM. Clock/mode changes are latched on future events rather than moving live read heads. Each captured fragment can persist for multiple generations, creating many arrivals without a continuously unstable feedback tap field.
+LATTICE therefore does not assume that successful light triple-custom operation guarantees enough margin for a heavy three-stage custom system. The CORE + FIELD pivot is the practical response to repeated physical load-balance failure.
 
-### SPACE — environment (`revfx`)
-- TIME = **SPACE**
-- DEPTH = **DRIFT**
-- SHIFT+DEPTH = **MIX**
+---
 
-SPACE is intentionally simpler than the previous CLOUD concept. It uses irregular early reflections, pre-delay and a four-line FDN. DRIFT adds slow stereo movement, small delay modulation and slightly darker damping. It should sound like a large room that never sits completely still, not a third generative processor.
+## Current next milestone
 
-## Hardware observations that drove 0.2
+Implement FIELD from `LATTICE_FIELD_SPEC.md`, then physically establish:
 
-Physical original NTS-1 MkI testing of the previous versions found:
-- CORE 0.1-2: the useful lower/mid ACTIVITY region exposed separate loops, while the upper range consolidated into a loud steady/beeping tone. The 32-voice code itself ran, but the simultaneous deterministic summing was not musically useful.
-- ECHO 0.1-1: aggressive knob movement could produce crunch or complete signal loss. The continuously moving 12-tap design is therefore retired.
-- CLOUD 0.1-1: audible but still more complex than needed and not close enough to the intended simple spatial role.
-
-These are hardware-reported sound/behavior observations, not proof of universal MkI behavior.
-
-## Hardware observation vs documentation
-
-The project owner's physical original NTS-1 MkI reports system firmware `N1.2` (v1.20) and panel `P1.0`. In normal long-term use, that unit has audibly run a custom ModFX, custom DelFX and custom RevFX together. This was explicitly re-tested with BALLISTIC (`delfx`) and ABYSS (`revfx`) on fresh external Chompi audio, with both processors responding independently.
-
-Korg's public SDK documentation states that first-generation NTS-1 custom delay and reverb effects share a runtime and ordinarily only one of those two can be custom at a time. Because the observed target unit differs from that simple documented limitation, LATTICE treats simultaneous three-stage operation as **hardware-observed behavior on this specific unit**, not a universal claim. Individual-stage QA remains mandatory before judging the full chain.
-
-## 0.2 identity gates
-
-1. CORE: the lower/mid range still exposes recognizably separate melodic microloops.
-2. CORE: maximum ACTIVITY becomes a moving swarm, not a steady beep or clipped mass.
-3. ECHO: CLOCK changes rhythmically restructure repeats without crunching or dropping the signal.
-4. ECHO: FORWARD / REVERSE / PING-PONG / STUTTER are plainly distinguishable.
-5. ECHO: repeated fragments form a dense field over time while the direct signal remains audible.
-6. SPACE: a clear reverb tail is audible at moderate MIX without crushing the source.
-7. SPACE: DRIFT changes movement/darkness without reading as chorus.
-8. Full chain: composition -> multiplication -> environment remains perceptible as three separate jobs.
+- obvious intentional response at middle MIX;
+- finite phrase lifetime with no endless distinct repeats;
+- reliable bloom on every audible phrase;
+- fat BODY plus airy/ethereal HALO;
+- clear dry/source audio and clean foreground echoes;
+- no clicks/crunch/dropouts during CLOCK, MODE, or MIX sweeps;
+- CORE + FIELD aggressive-use stability;
+- extended physical MkI run before hardware validation.
