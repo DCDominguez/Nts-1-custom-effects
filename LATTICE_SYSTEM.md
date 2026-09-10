@@ -12,9 +12,11 @@ Before changing LATTICE DSP:
 
 1. **`LATTICE_HISTORY.md`** — complete project history, physical hardware findings, failed architectures, and engineering lessons.
 2. **`LATTICE_FIELD_SPEC.md`** — current next-build specification and hard guardrails.
-3. **Issue #9** — raw physical MkI QA notes and open hardware gates.
+3. **`LATTICE_REPORTING.md`** — mandatory update-reporting protocol for every meaningful development step.
+4. **`reports/lattice/`** — chronological design, build, CI, and physical-hardware update reports.
+5. **Issue #9** — raw physical MkI QA notes and open hardware gates.
 
-Commit history records what changed. `LATTICE_HISTORY.md` records why.
+Commit history records what changed. `LATTICE_HISTORY.md` records why. `reports/lattice/` records each development step as it happened.
 
 ---
 
@@ -107,6 +109,13 @@ The reason is physical hardware behavior, not compile failure: CORE + ECHO + SPA
 ---
 
 ## Non-negotiable system doctrine
+
+### Repository reporting
+
+- Every meaningful architecture, DSP, control, gain, sound-quality, optimization, build, CI, or physical-test step must add a chronological report under `reports/lattice/` in the same development cycle.
+- Follow `LATTICE_REPORTING.md`.
+- Reports must distinguish design intent, CI result, inference, and physical MkI observation.
+- Durable lessons must also be folded into `LATTICE_HISTORY.md`; current target changes must update this file and/or `LATTICE_FIELD_SPEC.md`.
 
 ### Hardware truth
 
