@@ -18,8 +18,6 @@ static const float kGuardCeiling = 0.90f;
 // physical pass found 0.3 too subtle at full MIX and distorted when preceded
 // by modulation. One stereo diffusion stage now feeds a fixed four-line FDN;
 // DRIFT moves output geometry/damping instead of moving four delay heads.
-// This preserves a dark, living room while removing the most expensive
-// per-sample interpolated reads and feedback-path soft-limit divisions.
 __sdram float s_pre_l[kPreSize];
 __sdram float s_pre_r[kPreSize];
 __sdram float s_diff_l[kDiffSize];
@@ -89,22 +87,18 @@ static inline float allpass(float x, float *buffer, uint32_t mask,
 }
 
 static inline float feedback_bound(float x) {
-  // Emergency-only bound. Normal operation should remain linear here; unlike
-  // SPACE 0.3 this does not continuously waveshape every feedback write.
   return clampf(x, -0.985f, 0.985f);
 }
 
 static inline void guard_pair(float &l, float &r) {
   const float peak = maxf(absf(l), absf(r));
   const float target = peak > kGuardCeiling ? (kGuardCeiling / peak) : 1.0f;
-
   if (target < s_guard_gain) {
     s_guard_gain = target;
   } else {
     s_guard_gain += (target - s_guard_gain) * 0.0012f;
     if (s_guard_gain > 1.0f) s_guard_gain = 1.0f;
   }
-
   l *= s_guard_gain;
   r *= s_guard_gain;
 }
@@ -181,7 +175,11 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float r2 = read_fixed(s_fdn2, s_fdn_write, kFdnMask, 2671u);
     const float r3 = read_fixed(s_fdn3, s_fdn_write, kFdnMask, 3433u);
 
-    const float damping = 0.20f + 0.12f * (1.0f - s_drift);
+    // Larger SPACE values are deliberately less damped as well as more
+    // regenerative. The first 0.4 candidate changed feedback but kept the
+    // damping network too lossy for a meaningfully persistent large-room tail.
+    const float damping = clampf(0.32f + 0.12f * s_space - 0.06f * s_drift,
+                                 0.26f, 0.44f);
     s_lp0 += (r0 - s_lp0) * damping;
     s_lp1 += (r1 - s_lp1) * damping;
     s_lp2 += (r2 - s_lp2) * damping;
@@ -194,12 +192,7 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
 
     const float diff_mid = 0.5f * (diff_l + diff_r);
     const float diff_side = 0.5f * (diff_l - diff_r);
-
-    // A 0.50 -> 0.86 feedback range gives SPACE a genuinely long upper range
-    // while remaining bounded. The first 0.4 candidate topped out at 0.76 and
-    // the A-class late-room test correctly showed that its large-SPACE tail
-    // decayed too quickly to separate itself from the small-room state.
-    const float feedback = 0.50f + 0.36f * s_space;
+    const float feedback = 0.50f + 0.42f * s_space;
     const float inject = mid * 0.10f + diff_mid * (0.30f + 0.08f * s_space);
     const float inject_side = side * (0.08f + 0.08f * s_drift) +
                               diff_side * (0.16f + 0.08f * s_drift);
