@@ -32,7 +32,7 @@ User DELAY and user REVERB are not treated as a supported independent simultaneo
 **Physical status:** **PASS for reported focused playing test**  
 **CORE + FIELD 0.1-2:** **PASS for reported focused combination test**.
 
-CORE 0.3-1 is now the current MkI reference.
+CORE 0.3-1 is the current MkI reference.
 
 Changes from 0.3-0:
 
@@ -61,7 +61,8 @@ Preserve FIELD's current sound unless later physical evidence requires a change.
 ## SPACE
 
 **Previous physically tested version:** `0.3-0`  
-**Current development candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
+**Current candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
+**Engineering status:** **A-CLASS / ARM PASS**  
 **0.4-0 physical status:** **RETEST REQUIRED**.
 
 ### Why 0.3-0 was rejected musically
@@ -75,26 +76,40 @@ Physical MkI observations:
 
 ### SPACE 0.4-0 revoice
 
-0.4 is a real architecture/runtime rework rather than a global gain boost:
+0.4 is an architecture/runtime rework rather than a global gain boost:
 
 - one stereo diffusion stage instead of two;
 - four fixed integer FDN read heads instead of continuously interpolated/modulated reads;
 - FDN backing buffers reduced from 8192 to 4096 floats each;
-- DRIFT now moves damping/stereo geometry instead of FDN delay time;
+- DRIFT moves damping/stereo geometry instead of FDN delay time;
 - feedback is mostly linear with an emergency state bound rather than continuous feedback soft limiting;
+- final SPACE feedback range is approximately 0.50 → 0.92, with larger SPACE values also less aggressively damped;
 - full MIX is intentionally wet-dominant: only 12% dry remains at maximum;
-- output guard recovery now tracks the currently safe target gain rather than staying stale until raw peak drops below the ceiling.
+- output guard recovery tracks the currently safe gain rather than staying stale until raw peak drops below the ceiling.
 
-The A-class SPACE harness now also checks:
+The first 0.4 candidates were rejected by the A-class late-room persistence test; the final decay/damping tuning then passed without weakening that contract.
 
-- middle-MIX presence;
-- full-MIX wet identity and useful level;
-- explicit early echo delivery;
-- post-overload guard recovery;
-- actual production CORE 0.3-1 → SPACE host-chain boundedness/delivery;
-- existing decay, DRIFT, stereo, reset and long-soak contracts.
+### Final SPACE engineering evidence
 
-The host chain test does not claim ARM timing equivalence.
+Pre-handoff workflow `34635428252` against source commit `9eaf35870da081747b6a5103791f69afeb154601`:
+
+- shared production-DSP common gate: **PASS**;
+- full 29-unit project-specific A-class run: **PASS**;
+- SPACE middle/full-MIX presence: **PASS**;
+- early echo delivery: **PASS**;
+- large-room persistence vs small room: **PASS**;
+- guard recovery: **PASS**;
+- production CORE 0.3-1 → SPACE host-chain boundedness/delivery: **PASS**;
+- long soak/reset/rest: **PASS**;
+- fresh ARM build/package: **PASS**.
+
+Artifacts:
+
+- ARM build artifact `10278060196`, SHA-256 `92e89efbff79f39fc83a9a3ac88537a12ed6baf56219dbf4396200dc5132be08`;
+- host results artifact `10278090244`, SHA-256 `9daf91c8a4d20e4a8c62705b7ae0117402d22fc06b164c493848677dd845d389`;
+- exact SPACE 0.4-0 binary SHA-256 `de4dd4c7ccef1c435939b0c617df5a12532b29a4d3bf8af061604c5e46405bc7`.
+
+The CORE → SPACE host test does not claim ARM timing equivalence. Physical MkI testing remains authoritative for the original combination-distortion complaint.
 
 See `reports/lattice/2026-09-12_space-0.4-0-revoice.md`.
 
@@ -115,12 +130,14 @@ ECHO remains historical rather than the preferred LATTICE delay stage.
 
 ## Next gate
 
-1. Complete SPACE 0.4-0 common/A-class/ARM CI.
-2. Hand over only the exact SPACE 0.4-0 binary after those gates pass.
-3. Physical MkI test:
-   - standalone middle MIX;
-   - standalone full MIX;
-   - TIME/SPACE and DEPTH/DRIFT sweeps;
-   - run after a ModFX and listen for the prior distorted quality;
-   - confirm level does not remain collapsed after a loud passage.
-4. If SPACE passes, record/freeze it and return to suite-wide delay/reverb/ModFX level calibration.
+Physically test the exact SPACE 0.4-0 binary:
+
+1. load/select and basic audio;
+2. standalone middle MIX — effect should be clearly present;
+3. standalone full MIX — room should be strong and enjoyable rather than faint;
+4. `TIME` / SPACE sweep — higher values should clearly extend the room;
+5. `DEPTH` / DRIFT sweep — motion should remain audible without roughness;
+6. run after a ModFX and listen specifically for the prior distorted quality;
+7. confirm level does not remain collapsed after a loud passage.
+
+If SPACE passes, record/freeze it and return to suite-wide delay/reverb/ModFX level calibration.
