@@ -57,8 +57,9 @@ void DELFX_PROCESS(float *x, uint32_t n) {
     bL[w] = inL;
     bR[w] = inR;
     w = (w + 1u) & (N - 1u);
-    x[2u * i] = ca(inL * (1.f - m) + wl * m);
-    x[2u * i + 1u] = ca(inR * (1.f - m) + wr * m);
+    const float dry = 1.f - m * m;
+    x[2u * i] = ca(inL * dry + wl * m);
+    x[2u * i + 1u] = ca(inR * dry + wr * m);
   }
 }
 
