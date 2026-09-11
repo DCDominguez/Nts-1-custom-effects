@@ -4,6 +4,22 @@ Status date: **2026-09-11**
 
 This document defines how the Human Soon NTS-1 MkI suite can expand to other current Korg logue SDK platforms without weakening the existing MkI validation record.
 
+## Current project gate
+
+**Cross-platform implementation is intentionally deferred until the original NTS-1 MkI suite is brought to the agreed A-class engineering standard and the active LATTICE MkI failures are resolved or explicitly dispositioned.**
+
+Platform research, compatibility notes and architectural planning may continue in parallel, but production ports should not outrun the MkI reference.
+
+The order is:
+
+1. finish A-class project-specific coverage for the active MkI suite;
+2. resolve/retest known MkI issues, especially LATTICE CORE high-TIME behavior and CORE + FIELD integration;
+3. keep the shared common gate and fresh ARM package gate green;
+4. freeze/document the MkI behavior that each portable DSP core must preserve;
+5. only then begin platform adapters and cross-platform CI/hardware recruitment.
+
+This keeps the MkI implementation as the musical and behavioral reference rather than trying to debug multiple platform ports while the source behavior is still moving.
+
 ## Current official Korg platform matrix
 
 Korg's current `logue-sdk` repository lists these supported product targets:
