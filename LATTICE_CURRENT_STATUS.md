@@ -27,14 +27,16 @@ User DELAY and user REVERB are not treated as a supported independent simultaneo
 
 ## Engineering status
 
-The full 29-unit suite, including CORE, FIELD, historical ECHO and historical SPACE, passed the repository's A-class engineering gate on candidate `5718d12416a242137892688e240e8ac41be5a0ca`:
+The full 29-unit suite passed the repository's A-class engineering gate on the original release candidate, and the changed CORE 0.3-1 candidate has now re-passed the exact-build gates:
 
-- 29/29 shared production-DSP common gate PASS;
-- 29/29 project-specific A-class harness PASS;
-- 29/29 fresh ARM build/package PASS;
-- final consolidated workflow `34613566166`.
+- Pre-handoff workflow `34628866540`;
+- shared production-DSP common gate: **PASS**;
+- full project-specific A-class harness run: **PASS**;
+- fresh ARM build/package: **PASS**;
+- ARM artifact `10275063747`, SHA-256 `22378a8e266a14a0d8bad999154e313fc6fe61e2142eeb827581bef123555503`;
+- extracted CORE 0.3-1 binary SHA-256 `1d91d643775e26bb698cd24c0980109561ebfbc18c5811c19c15d067ddaddaee`.
 
-A-class is engineering coverage only. Later DSP changes reopen the exact-build engineering and physical gates for the affected unit.
+A-class is engineering coverage only. Physical MkI findings remain stronger evidence for actual runtime/tone behavior.
 
 ## FIELD
 
@@ -55,6 +57,7 @@ Preserve FIELD's current sound unless later physical evidence requires a change.
 
 **Implemented candidate:** `0.3-1`  
 **Previous physically tested version:** `0.3-0`  
+**0.3-1 engineering status:** **A-CLASS / ARM PASS**  
 **0.3-1 physical status:** **RETEST REQUIRED**.
 
 Latest physical MkI observation on 0.3-0:
@@ -68,14 +71,14 @@ This refines the earlier blanket high-TIME failure description. CORE is not alwa
 
 ### CORE 0.3-1 runtime diagnostic
 
-The previously proposed scoped runtime profile is now implemented:
+The scoped runtime profile is implemented and has passed host/build validation:
 
 1. ordinary microloop ceiling reduced from **16 to 10 voices**;
 2. during full freeze, ordinary microloop scheduling, reads, phase advancement and repeat/wait state advancement are suspended;
 3. history format/length, patterns, pitch rules, loop rules, wet-drive formula, freeze path, guard and limiter are preserved;
-4. the A-class harness now explicitly checks the ten-voice ceiling and that ordinary microloop state does not advance during freeze.
+4. the A-class harness explicitly checks the ten-voice ceiling and that ordinary microloop state does not advance during freeze.
 
-This is a runtime/workload diagnostic, not a claim that CPU overload was proven. There is still no measured MkI CPU percentage or ARM cycle telemetry.
+This is a runtime/workload diagnostic, not proof that CPU overload caused the physical distortion. There is still no measured MkI CPU percentage or ARM cycle telemetry.
 
 See `reports/lattice/2026-09-12_core-0.3-1-runtime-profile.md`.
 
@@ -95,7 +98,7 @@ SPACE should not receive a simple global gain boost. It needs a rework/revoice t
 
 SPACE remains historical and is not part of the preferred CORE → FIELD architecture.
 
-Per current project priority, **SPACE work begins after CORE 0.3-1 has been built, A-class checked and physically retested**.
+Per current project priority, **SPACE work begins after CORE 0.3-1 is physically retested**.
 
 ## ECHO
 
@@ -120,11 +123,10 @@ Current doctrine:
 
 ## Next work
 
-1. Complete CORE 0.3-1 A-class host/build CI.
-2. Physically retest CORE 0.3-1 alone from upper TIME through maximum, preserving the liked loop behavior.
-3. Physically retest CORE 0.3-1 + FIELD 0.1-2 at upper/max TIME.
-4. If CORE is clean, record/freeze the MkI result. If not, investigate granular playback/runtime structure rather than globally lowering FIELD or CORE.
-5. Then rework SPACE for stronger standalone presence plus combination-safe gain structure.
-6. Resume suite-wide level/loudness calibration after the CORE → SPACE priority work.
+1. Physically retest CORE 0.3-1 alone from upper TIME through maximum, preserving the liked loop behavior.
+2. Physically retest CORE 0.3-1 + FIELD 0.1-2 at upper/max TIME.
+3. If CORE is clean, record/freeze the MkI result. If not, investigate granular playback/runtime structure rather than globally lowering FIELD or CORE.
+4. Then rework SPACE for stronger standalone presence plus combination-safe gain structure.
+5. Resume suite-wide level/loudness calibration after the CORE → SPACE priority work.
 
 See `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md` and `reports/lattice/2026-09-12_core-0.3-1-runtime-profile.md`.
