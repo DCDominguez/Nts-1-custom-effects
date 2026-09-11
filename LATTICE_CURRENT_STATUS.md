@@ -25,108 +25,102 @@ OUTPUT
 
 User DELAY and user REVERB are not treated as a supported independent simultaneous pair on MkI because they share first-generation SDK memory regions.
 
-## Engineering status
+## CORE
 
-The full 29-unit suite passed the repository's A-class engineering gate on the original release candidate, and the changed CORE 0.3-1 candidate has now re-passed the exact-build gates:
+**Version:** `0.3-1`  
+**Engineering status:** **A-CLASS / ARM PASS**  
+**Physical status:** **PASS for reported focused playing test**  
+**CORE + FIELD 0.1-2:** **PASS for reported focused combination test**.
 
-- Pre-handoff workflow `34628866540`;
-- shared production-DSP common gate: **PASS**;
-- full project-specific A-class harness run: **PASS**;
-- fresh ARM build/package: **PASS**;
-- ARM artifact `10275063747`, SHA-256 `22378a8e266a14a0d8bad999154e313fc6fe61e2142eeb827581bef123555503`;
-- extracted CORE 0.3-1 binary SHA-256 `1d91d643775e26bb698cd24c0980109561ebfbc18c5811c19c15d067ddaddaee`.
+CORE 0.3-1 is now the current MkI reference.
 
-A-class is engineering coverage only. Physical MkI findings remain stronger evidence for actual runtime/tone behavior.
+Changes from 0.3-0:
+
+1. ordinary microloop ceiling reduced from 16 to 10 voices;
+2. full freeze suspends ordinary microloop scheduling, reads, phase advancement and repeat/wait state advancement;
+3. history format/length, patterns, pitch rules, loop rules, wet-drive formula, freeze path, guard and limiter were preserved.
+
+The exact candidate passed workflow `34628866540` and then passed the requested original-NTS-1 MkI checks at upper/max TIME both standalone and with FIELD 0.1-2.
+
+This supports keeping the reduced-workload profile but does not prove a measured CPU cause; no MkI cycle/CPU telemetry exists.
+
+See:
+
+- `reports/lattice/2026-09-12_core-0.3-1-runtime-profile.md`
+- `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`
 
 ## FIELD
 
 **Version:** `0.1-2` (`LatField`, custom `delfx`)  
-**Physical status:** **LOAD PASS / RUNTIME PASS / MUSICAL PASS for the latest reported playing test**.
+**Physical status:** **LOAD / RUNTIME / MUSICAL PASS for reported playing tests**.
 
-FIELD remains the preferred delay/spatial stage for the current MkI LATTICE architecture. No new issue was reported during the 2026-09-12 A-class release-candidate physical pass.
-
-Previously confirmed:
-
-- standalone listening behavior: plays as intended;
-- Corrosion + FIELD: clean in the tested playing context;
-- Albedo + FIELD is not treated as an independent simultaneous user-REVERB + user-DELAY pair on MkI.
+FIELD remains the preferred delay/spatial stage for the MkI LATTICE architecture and passed the latest focused pairing with CORE 0.3-1.
 
 Preserve FIELD's current sound unless later physical evidence requires a change.
 
-## CORE
-
-**Implemented candidate:** `0.3-1`  
-**Previous physically tested version:** `0.3-0`  
-**0.3-1 engineering status:** **A-CLASS / ARM PASS**  
-**0.3-1 physical status:** **RETEST REQUIRED**.
-
-Latest physical MkI observation on 0.3-0:
-
-- CORE loads and sounds good;
-- at maximum TIME it loops the note using the current freeze/loop behavior;
-- intermittent distortion still appears at or near maximum TIME;
-- CORE can also distort when paired with another effect, although some combinations/runs are clean.
-
-This refines the earlier blanket high-TIME failure description. CORE is not always unusable at high TIME; instead, extreme TIME and some multi-effect conditions remain intermittently unstable.
-
-### CORE 0.3-1 runtime diagnostic
-
-The scoped runtime profile is implemented and has passed host/build validation:
-
-1. ordinary microloop ceiling reduced from **16 to 10 voices**;
-2. during full freeze, ordinary microloop scheduling, reads, phase advancement and repeat/wait state advancement are suspended;
-3. history format/length, patterns, pitch rules, loop rules, wet-drive formula, freeze path, guard and limiter are preserved;
-4. the A-class harness explicitly checks the ten-voice ceiling and that ordinary microloop state does not advance during freeze.
-
-This is a runtime/workload diagnostic, not proof that CPU overload caused the physical distortion. There is still no measured MkI CPU percentage or ARM cycle telemetry.
-
-See `reports/lattice/2026-09-12_core-0.3-1-runtime-profile.md`.
-
 ## SPACE
 
-**Version:** historical `0.3-0` custom `revfx`  
-**Physical status:** **FAIL / REDESIGN CANDIDATE for musical quality/combination robustness**.
+**Previous physically tested version:** `0.3-0`  
+**Current development candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
+**0.4-0 physical status:** **RETEST REQUIRED**.
 
-Latest physical MkI observation:
+### Why 0.3-0 was rejected musically
 
-- loads and produces the intended echo/spatial behavior;
-- remains very subtle even at full MIX;
-- distorts when run with modulation in the reported test;
-- the effect remains audible underneath the distorted sound quality.
+Physical MkI observations:
 
-SPACE should not receive a simple global gain boost. It needs a rework/revoice that improves standalone identity while maintaining safe local gain/headroom in combinations.
+- loaded and produced the intended echo/spatial behavior;
+- very subtle even at full MIX;
+- distorted when run after modulation;
+- the echo effect remained audible underneath the distorted quality.
 
-SPACE remains historical and is not part of the preferred CORE → FIELD architecture.
+### SPACE 0.4-0 revoice
 
-Per current project priority, **SPACE work begins after CORE 0.3-1 is physically retested**.
+0.4 is a real architecture/runtime rework rather than a global gain boost:
+
+- one stereo diffusion stage instead of two;
+- four fixed integer FDN read heads instead of continuously interpolated/modulated reads;
+- FDN backing buffers reduced from 8192 to 4096 floats each;
+- DRIFT now moves damping/stereo geometry instead of FDN delay time;
+- feedback is mostly linear with an emergency state bound rather than continuous feedback soft limiting;
+- full MIX is intentionally wet-dominant: only 12% dry remains at maximum;
+- output guard recovery now tracks the currently safe target gain rather than staying stale until raw peak drops below the ceiling.
+
+The A-class SPACE harness now also checks:
+
+- middle-MIX presence;
+- full-MIX wet identity and useful level;
+- explicit early echo delivery;
+- post-overload guard recovery;
+- actual production CORE 0.3-1 → SPACE host-chain boundedness/delivery;
+- existing decay, DRIFT, stereo, reset and long-soak contracts.
+
+The host chain test does not claim ARM timing equivalence.
+
+See `reports/lattice/2026-09-12_space-0.4-0-revoice.md`.
 
 ## ECHO
 
 **Version:** historical `0.3-0` custom `delfx`  
-**Physical status:** **LOAD PASS / RUNTIME PASS / MUSICAL PASS for the latest reported playing test**.
+**Physical status:** **LOAD / RUNTIME / MUSICAL PASS for latest reported playing test**.
 
-No new problem was reported in the 2026-09-12 A-class release-candidate physical pass. ECHO remains historical rather than the preferred LATTICE delay stage.
+ECHO remains historical rather than the preferred LATTICE delay stage.
 
-## System-level physical findings
+## Current doctrine
 
-Most modulation + delay/reverb pairings were reported to work well. The main LATTICE exception remains CORE, which can distort intermittently in combinations.
+- each LATTICE processor must have obvious standalone musical identity;
+- multi-effect safety should come from correct local gain structure and bounded runtime/state behavior, not blanket attenuation;
+- CORE 0.3-1 and FIELD 0.1-2 are the current preferred MkI pair;
+- SPACE is a standalone reverb experiment and must be robust after ModFX even though it is not part of the preferred CORE → FIELD system;
+- do not infer support for simultaneous user DELAY + user REVERB on original MkI.
 
-Do not solve these findings by globally lowering every LATTICE processor. The user requirement is that each effect should stand strongly on its own.
+## Next gate
 
-Current doctrine:
-
-- standalone identity must be obvious;
-- multi-effect safety comes from correct local gain structure, bounded regenerative paths and efficient runtime behavior;
-- FIELD is preserved as the current preferred delay reference;
-- CORE keeps its sound/loop identity while the intermittent extreme-TIME/combination distortion is isolated;
-- SPACE is next for redesign after the CORE result is understood.
-
-## Next work
-
-1. Physically retest CORE 0.3-1 alone from upper TIME through maximum, preserving the liked loop behavior.
-2. Physically retest CORE 0.3-1 + FIELD 0.1-2 at upper/max TIME.
-3. If CORE is clean, record/freeze the MkI result. If not, investigate granular playback/runtime structure rather than globally lowering FIELD or CORE.
-4. Then rework SPACE for stronger standalone presence plus combination-safe gain structure.
-5. Resume suite-wide level/loudness calibration after the CORE → SPACE priority work.
-
-See `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md` and `reports/lattice/2026-09-12_core-0.3-1-runtime-profile.md`.
+1. Complete SPACE 0.4-0 common/A-class/ARM CI.
+2. Hand over only the exact SPACE 0.4-0 binary after those gates pass.
+3. Physical MkI test:
+   - standalone middle MIX;
+   - standalone full MIX;
+   - TIME/SPACE and DEPTH/DRIFT sweeps;
+   - run after a ModFX and listen for the prior distorted quality;
+   - confirm level does not remain collapsed after a loud passage.
+4. If SPACE passes, record/freeze it and return to suite-wide delay/reverb/ModFX level calibration.
