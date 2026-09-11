@@ -4,6 +4,7 @@
 namespace {
 static constexpr uint32_t N = 65536u;
 static constexpr float SR = 48000.f;
+static constexpr float kWetOutputGain = 2.0f;
 static float bL[N] __sdram, bR[N] __sdram;
 static float del[4] = {5000.f, 9000.f, 15000.f, 22000.f};
 static float tar[4] = {5000.f, 9000.f, 15000.f, 22000.f};
@@ -71,8 +72,10 @@ void DELFX_PROCESS(float *x, uint32_t n) {
     float inL = x[2u * i], inR = x[2u * i + 1u], fb = .18f + .38f * d;
     bL[w] = ca(inL + wl * fb);
     bR[w] = ca(inR + wr * fb);
-    x[2u * i] = ca(inL * (1.f - m) + wl * m);
-    x[2u * i + 1u] = ca(inR * (1.f - m) + wr * m);
+    const float dry = 1.f - m * m;
+    const float wet = m * kWetOutputGain;
+    x[2u * i] = ca(inL * dry + wl * wet);
+    x[2u * i + 1u] = ca(inR * dry + wr * wet);
     w = (w + 1u) & (N - 1u);
   }
 }
