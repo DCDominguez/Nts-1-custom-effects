@@ -17,6 +17,14 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 
 This report preserves the tester's observations without turning subjective level/tone comments into unmeasured numerical claims.
 
+## SPECTRA
+
+- SPECTRA loaded and the tester reported that it sounds great overall.
+- 1–3 internal voices were reported as working well / musically successful.
+- At 4 voices the sound starts becoming bad.
+- Decision: cap SPECTRA at 3 voices for the MkI release line rather than trying to preserve a fourth voice at the cost of the approved sound.
+- Follow-up candidate: SPECTRA `0.2-1`, with a hard 1–3 voice range. See `reports/testing/2026-09-12_spectra-three-voice-cap.md`.
+
 ## Suite-wide observations
 
 ### Reverb family
@@ -73,19 +81,21 @@ This is not a 30-minute soak certification unless separately reported.
 
 The A-class engineering grade remains separate and intact. The new physical test primarily identifies a **post-A-class calibration layer**:
 
-1. family-wide perceived-level normalization for Delay and Reverb;
-2. family-wide level consistency review for ModFX;
-3. increase audible identity for ASCENDER, ATTRACTOR and CAPSTAN;
-4. tame IRONROT's loudness without losing its newly successful corrosion character;
-5. redesign/revoice LATTICE SPACE;
-6. continue isolating LATTICE CORE high-TIME / combination distortion.
+1. preserve SPECTRA's approved sound by limiting it to 3 voices;
+2. family-wide perceived-level normalization for Delay and Reverb;
+3. family-wide level consistency review for ModFX;
+4. increase audible identity for ASCENDER, ATTRACTOR and CAPSTAN;
+5. tame IRONROT's loudness without losing its newly successful corrosion character;
+6. redesign/revoice LATTICE SPACE;
+7. continue isolating LATTICE CORE high-TIME / combination distortion.
 
 ## Recommended development order
 
-1. Build a reproducible loudness/level measurement protocol that supplements the existing peak/bounds tests without replacing listening judgment.
-2. Calibrate Delay and Reverb output/mix curves as families, preserving each effect's identity and dry path.
-3. Calibrate ModFX wet contribution / apparent loudness, with dedicated targets for ASCENDER, ATTRACTOR, CAPSTAN and IRONROT.
-4. Rework LATTICE SPACE separately; do not treat it as a simple gain-fix candidate.
-5. Keep LATTICE CORE combination/runtime distortion as an independent diagnostic problem.
+1. Lock SPECTRA to the approved 3-voice ceiling and re-run its exact-build engineering/hardware gate.
+2. Build a reproducible loudness/level measurement protocol that supplements the existing peak/bounds tests without replacing listening judgment.
+3. Calibrate Delay and Reverb output/mix curves as families, preserving each effect's identity and dry path.
+4. Calibrate ModFX wet contribution / apparent loudness, with dedicated targets for ASCENDER, ATTRACTOR, CAPSTAN and IRONROT.
+5. Rework LATTICE SPACE separately; do not treat it as a simple gain-fix candidate.
+6. Keep LATTICE CORE combination/runtime distortion as an independent diagnostic problem.
 
 Any DSP change made from these findings reopens the affected unit's exact-build physical gate and must retain A-class automated coverage.
