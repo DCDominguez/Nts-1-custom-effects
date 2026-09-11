@@ -136,17 +136,21 @@ int main() {
   const double fast_delta = adjacent_window_delta(fast, 12000);
   require(fast_delta > slow_delta * 1.35 + 0.005, "Motion did not measurably increase drift speed");
 
-  // Chaos contract: at zero it must not perturb the deterministic note-on baseline; at maximum it may vary phase/pitch/level but stays bounded.
+  // Chaos contract: compare independent identical patches so default Drift/Motion slew history cannot contaminate the seed test.
   base_patch(1);
   osc_rng_state = 0x12345678u;
   auto clean_a = render(69, 24000);
+  base_patch(1);
   osc_rng_state = 0x87654321u;
   auto clean_b = render(69, 24000);
   require(hs_measure::max_abs_diff(clean_a, clean_b) < 1e-5, "Chaos=0 depends on random seed");
+
   base_patch(4);
   OSC_PARAM(k_user_osc_param_id6, 100);
   osc_rng_state = 0x12345678u;
   auto chaos_a = render(69, 24000);
+  base_patch(4);
+  OSC_PARAM(k_user_osc_param_id6, 100);
   osc_rng_state = 0x87654321u;
   auto chaos_b = render(69, 24000);
   require(hs_measure::max_abs_diff(chaos_a, chaos_b) > 1e-4, "Chaos=100 failed to alter note-on variation");
