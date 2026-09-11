@@ -60,58 +60,60 @@ Preserve FIELD's current sound unless later physical evidence requires a change.
 
 ## SPACE
 
-**Previous physically tested version:** `0.3-0`  
-**Current candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
-**Engineering status:** **A-CLASS / ARM PASS**  
-**0.4-0 physical status:** **RETEST REQUIRED**.
+**Last physically tested candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
+**0.4-0 engineering status:** **A-CLASS / ARM PASS**  
+**0.4-0 physical combination status:** **FAIL / RETEST**  
+**Current development candidate:** `0.4-1` guard/headroom diagnostic  
+**0.4-1 physical status:** **NOT YET TESTED**.
 
-### Why 0.3-0 was rejected musically
+### New 0.4-0 physical result
 
-Physical MkI observations:
+Literal tester report:
 
-- loaded and produced the intended echo/spatial behavior;
-- very subtle even at full MIX;
-- distorted when run after modulation;
-- the echo effect remained audible underneath the distorted quality.
+> “still hitting distortion on core with space. actually any modulation plus space i get distortion”
 
-### SPACE 0.4-0 revoice
+This means the current failure should be localized to SPACE rather than reopening CORE generally:
 
-0.4 is an architecture/runtime rework rather than a global gain boost:
+- CORE 0.3-1 standalone: PASS in the immediately preceding focused test;
+- CORE 0.3-1 + FIELD 0.1-2: PASS;
+- CORE 0.3-1 + SPACE 0.4-0: distortion reported;
+- tester further reports distortion with **any modulation + SPACE** in the current MkI test.
 
-- one stereo diffusion stage instead of two;
-- four fixed integer FDN read heads instead of continuously interpolated/modulated reads;
-- FDN backing buffers reduced from 8192 to 4096 floats each;
-- DRIFT moves damping/stereo geometry instead of FDN delay time;
-- feedback is mostly linear with an emergency state bound rather than continuous feedback soft limiting;
-- final SPACE feedback range is approximately 0.50 → 0.92, with larger SPACE values also less aggressively damped;
-- full MIX is intentionally wet-dominant: only 12% dry remains at maximum;
-- output guard recovery tracks the currently safe gain rather than staying stale until raw peak drops below the ceiling.
+No exact CPU/deadline, clipping or analog cause is inferred from the sound alone.
 
-The first 0.4 candidates were rejected by the A-class late-room persistence test; the final decay/damping tuning then passed without weakening that contract.
+Issue #9 comment `5639386820` records this result.
 
-### Final SPACE engineering evidence
+### Why 0.4-1 exists
 
-Pre-handoff workflow `34635428252` against source commit `9eaf35870da081747b6a5103791f69afeb154601`:
+SPACE 0.4-0 still had a sample-by-sample dynamic output guard. Whenever the raw wet/dry sum exceeded the ceiling, gain was changed immediately according to the current peak. That can create an audible nonlinear amplitude process on complex ModFX output even if the final samples stay numerically bounded.
 
-- shared production-DSP common gate: **PASS**;
-- full 29-unit project-specific A-class run: **PASS**;
-- SPACE middle/full-MIX presence: **PASS**;
-- early echo delivery: **PASS**;
-- large-room persistence vs small room: **PASS**;
-- guard recovery: **PASS**;
-- production CORE 0.3-1 → SPACE host-chain boundedness/delivery: **PASS**;
-- long soak/reset/rest: **PASS**;
-- fresh ARM build/package: **PASS**.
+The 0.4-0 A-class chain test checked finite/bounded/useful output, but it did not reject frequent internal FDN safety-bound hits or repeated guard action. A numerically bounded signal can still sound distorted.
 
-Artifacts:
+0.4-1 therefore isolates this mechanism before a more destructive topology rewrite:
 
-- ARM build artifact `10278060196`, SHA-256 `92e89efbff79f39fc83a9a3ac88537a12ed6baf56219dbf4396200dc5132be08`;
-- host results artifact `10278090244`, SHA-256 `9daf91c8a4d20e4a8c62705b7ae0117402d22fc06b164c493848677dd845d389`;
-- exact SPACE 0.4-0 binary SHA-256 `de4dd4c7ccef1c435939b0c617df5a12532b29a4d3bf8af061604c5e46405bc7`.
+1. removes the dynamic output guard completely;
+2. keeps only an emergency final output bound;
+3. reduces diffusion/FDN injection and maximum feedback for more internal headroom;
+4. keeps strong wet presence by increasing readout weighting instead of driving the feedback network harder;
+5. adds explicit counters for FDN state-bound hits and emergency output-bound hits;
+6. expands the A-class harness so CORE → SPACE and IRONROT → SPACE must produce useful audio with **zero hidden clamp hits**.
 
-The CORE → SPACE host test does not claim ARM timing equivalence. Physical MkI testing remains authoritative for the original combination-distortion complaint.
+Production source commit: `15382a34c25b94aefa36c84f2056ab7f32d42354`  
+Manifest bump: `d6d9566cf9499498fbbd48a5306bd07e05a4b3c0`  
+Harness update: `03d2ec273bbe4aea56aacb447610ca46194350c7`.
 
-See `reports/lattice/2026-09-12_space-0.4-0-revoice.md`.
+See `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md`.
+
+### Fallback if 0.4-1 still distorts
+
+If the exact 0.4-1 build passes its host/ARM gates but still distorts after ModFX on physical MkI, stop tuning gain/limiting and move to a substantially cheaper SPACE topology:
+
+- two-line cross-coupled room instead of four-line FDN;
+- fewer SDRAM reads/writes;
+- no separate diffusion bank if possible;
+- preserve early echo identity, dark stereo movement and long-room control with a lower runtime footprint.
+
+That next step would specifically test the remaining runtime/deadline hypothesis.
 
 ## ECHO
 
@@ -126,18 +128,12 @@ ECHO remains historical rather than the preferred LATTICE delay stage.
 - multi-effect safety should come from correct local gain structure and bounded runtime/state behavior, not blanket attenuation;
 - CORE 0.3-1 and FIELD 0.1-2 are the current preferred MkI pair;
 - SPACE is a standalone reverb experiment and must be robust after ModFX even though it is not part of the preferred CORE → FIELD system;
+- physical MkI evidence outranks host-model assumptions;
 - do not infer support for simultaneous user DELAY + user REVERB on original MkI.
 
 ## Next gate
 
-Physically test the exact SPACE 0.4-0 binary:
-
-1. load/select and basic audio;
-2. standalone middle MIX — effect should be clearly present;
-3. standalone full MIX — room should be strong and enjoyable rather than faint;
-4. `TIME` / SPACE sweep — higher values should clearly extend the room;
-5. `DEPTH` / DRIFT sweep — motion should remain audible without roughness;
-6. run after a ModFX and listen specifically for the prior distorted quality;
-7. confirm level does not remain collapsed after a loud passage.
-
-If SPACE passes, record/freeze it and return to suite-wide delay/reverb/ModFX level calibration.
+1. Complete host/A-class and fresh ARM build/package for SPACE 0.4-1.
+2. If engineering gates pass, physically test the exact 0.4-1 binary after at least one built-in ModFX and CORE 0.3-1.
+3. If distortion is gone, record whether middle/full MIX and SPACE/DRIFT musical identity remain acceptable.
+4. If distortion remains, move directly to the lower-runtime two-line SPACE diagnostic instead of further gain tweaks.
