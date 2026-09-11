@@ -2,7 +2,45 @@
 
 Target: **Korg Nu:Tekt NTS-1 digital kit, original / MkI**
 
-## Latest A-class release-candidate physical test — 2026-09-12
+## Latest focused LATTICE follow-up — 2026-09-12
+
+### LATTICE CORE 0.3-1
+
+Exact handed-off binary SHA-256: `1d91d643775e26bb698cd24c0980109561ebfbc18c5811c19c15d067ddaddaee`  
+Pre-handoff workflow: `34628866540`
+
+The focused physical regression covered the two checks requested at handoff:
+
+1. CORE 0.3-1 standalone through upper/max TIME, including the previous intermittent-distortion region and max-TIME loop/freeze;
+2. CORE 0.3-1 + FIELD 0.1-2 through the upper/max-TIME region.
+
+Tester report: **“okay pass for both.”**
+
+Disposition:
+
+- CORE 0.3-1 standalone focused playing test: **PASS**
+- CORE 0.3-1 + FIELD 0.1-2 focused combination test: **PASS**
+- CORE 0.3-1 is the current MkI reference unless later physical evidence reopens it.
+
+No 30-minute soak or unreported effect combinations are inferred.
+
+See `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`.
+
+### LATTICE SPACE
+
+The previously tested 0.3-0 remains physically characterized as:
+
+- load/basic function PASS;
+- too subtle even at full MIX;
+- echo/spatial behavior audible;
+- distorted sound quality when run with modulation;
+- redesign/revoice required.
+
+SPACE has therefore moved to a new 0.4-0 candidate. Any prior physical result does **not** validate 0.4-0; its exact-build physical gate is open until host/build gates pass and the new binary is tested.
+
+---
+
+## A-class release-candidate physical test — 2026-09-12
 
 Candidate engineering commit: `5718d12416a242137892688e240e8ac41be5a0ca`  
 Pre-handoff workflow: `34613566166`
@@ -28,7 +66,7 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 
 #### Reverb
 
-- **LATTICE SPACE** — very subtle even at full MIX; echo/spatial behavior is audible, but it distorts when run with modulation. **Redesign/revoice candidate.**
+- **LATTICE SPACE 0.3-0** — very subtle even at full MIX; echo/spatial behavior is audible, but it distorts when run with modulation. **Redesign/revoice candidate; superseded for development by 0.4-0 candidate.**
 - **Other reverbs** — tested well, but perceived output level is too low.
 
 #### Delay
@@ -42,12 +80,12 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 - **ATTRACTOR** — barely noticeable.
 - **CAPSTAN** — barely noticeable.
 - **IRONROT** — sounds great, but can become quite loud.
-- **LATTICE CORE** — sounds great; maximum TIME loops the note, with intermittent distortion. Distortion can also occur in some combinations with another effect, although some runs are clean.
+- **LATTICE CORE 0.3-0** — sounded great; maximum TIME looped the note, with intermittent distortion. This exact finding is superseded for current development by the successful focused CORE 0.3-1 retest above.
 - Other modulation effects not listed above were reported to load and sound as intended.
 
 ### Combination testing
 
-Most ModFX + Delay/Reverb combinations tested well. The main recurring exception is LATTICE CORE, where intermittent distortion remains possible.
+Most ModFX + Delay/Reverb combinations tested well. The original RC's main recurring exception was LATTICE CORE 0.3-0. The later CORE 0.3-1 focused CORE + FIELD test passed as recorded above.
 
 ### Status rule
 
@@ -55,7 +93,7 @@ This physical report is separate from the repository's A-class engineering grade
 
 Any DSP change made to address level, identity or distortion reopens the physical gate for that exact changed candidate.
 
-See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`, `reports/testing/2026-09-12_spectra-three-voice-cap.md`, and `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`.
+See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`, `reports/testing/2026-09-12_spectra-three-voice-cap.md`, `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`, and `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`.
 
 ---
 
