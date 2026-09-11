@@ -60,73 +60,44 @@ Preserve FIELD's current sound unless later physical evidence requires a change.
 
 ## SPACE
 
-**Last physically tested candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
-**0.4-0 physical combination status:** **FAIL / RETEST**  
-**Current candidate:** `0.4-1` guard/headroom diagnostic  
-**0.4-1 engineering status:** **A-CLASS / ARM PASS**  
-**0.4-1 physical status:** **RETEST REQUIRED**.
+**Version:** `0.4-1` (`LatSpace`, custom `revfx`)  
+**Engineering status:** **A-CLASS / ARM PASS**  
+**Physical status:** **PASS WITH NOTE**  
+**Current MkI reference:** **0.4-1**.
 
-### New 0.4-0 physical result
+### Physical result
 
-Literal tester report:
+The prior 0.4-0 build still distorted after modulation, including CORE and other modulation effects. 0.4-1 removed the sample-by-sample output guard, reduced regenerative drive for more headroom, preserved wet presence at readout, and added hidden-clipping counters to the A-class harness.
 
-> “still hitting distortion on core with space. actually any modulation plus space i get distortion”
+The exact 0.4-1 binary then received the physical MkI report:
 
-This means the current failure should be localized to SPACE rather than reopening CORE generally:
+> “MUCH better. works great now. just some minor minor minor distortion on the top but this is great”
 
-- CORE 0.3-1 standalone: PASS in the immediately preceding focused test;
-- CORE 0.3-1 + FIELD 0.1-2: PASS;
-- CORE 0.3-1 + SPACE 0.4-0: distortion reported;
-- tester further reports distortion with **any modulation + SPACE** in the current MkI test.
+Disposition:
 
-No exact CPU/deadline, clipping or analog cause is inferred from the sound alone.
+- standalone/general musical result: **PASS for the reported playing test**;
+- ModFX → SPACE behavior: **PASS WITH NOTE**;
+- the broad modulation-combination distortion from 0.4-0 is materially improved;
+- a very small amount of distortion remains near the top end of the tested range;
+- preserve 0.4-1 rather than immediately reworking the topology again.
 
-Issue #9 comment `5639386820` records this result.
+Exact binary SHA-256: `56fd5b263920831af7298839d742482b837408795b2f29aa0232b5ef37a80b56`  
+Pre-handoff workflow: `34637349268`.
 
-### SPACE 0.4-1 diagnostic
-
-SPACE 0.4-0 still had a sample-by-sample dynamic output guard. Whenever the raw wet/dry sum exceeded the ceiling, gain was changed immediately according to the current peak. A numerically bounded waveform can therefore still be audibly distorted.
-
-0.4-1 isolates that mechanism before a more destructive topology rewrite:
-
-1. removes the dynamic output guard completely;
-2. keeps only an emergency final output bound;
-3. reduces diffusion/FDN injection and maximum feedback for more internal headroom;
-4. keeps strong wet presence by increasing readout weighting instead of driving the feedback network harder;
-5. adds explicit counters for FDN state-bound hits and emergency output-bound hits;
-6. expands the A-class harness so CORE → SPACE and IRONROT → SPACE must produce useful audio with **zero hidden clamp hits**.
-
-Production source commit: `15382a34c25b94aefa36c84f2056ab7f32d42354`  
-Manifest bump: `d6d9566cf9499498fbbd48a5306bd07e05a4b3c0`  
-Harness update: `03d2ec273bbe4aea56aacb447610ca46194350c7`.
-
-### 0.4-1 engineering result
-
-Pre-handoff workflow `34637349268`, branch head `f5483a871a58f74a31cf5598a13b553723496e62`:
+Engineering evidence for 0.4-1:
 
 - shared production-DSP common gate: **PASS**;
 - full project-specific A-class harness run: **PASS**;
 - CORE 0.3-1 → SPACE hidden-clipping test: **PASS**;
 - IRONROT → SPACE hidden-clipping test: **PASS**;
-- fresh ARM build/package against a current official Korg logue SDK clone: **PASS**;
-- ARM artifact `10278202462`, SHA-256 `78f683d3fdd79d26bd0416606c6af303a4681cf58c5c41fa9f8f84ae0c5b04b3`;
-- host artifact `10279063165`, SHA-256 `a94ffcf488d76fca061a644fcb875b29dc647c81874668e7e0306641ef31ac52`;
-- exact SPACE 0.4-1 binary SHA-256 `56fd5b263920831af7298839d742482b837408795b2f29aa0232b5ef37a80b56`.
+- fresh ARM build/package against a current official Korg logue SDK clone: **PASS**.
 
-These checks reject hidden FDN/output clipping in the modeled chains, but they still do **not** establish MkI real-time deadline margin.
+The physical improvement is consistent with the 0.4-1 headroom/guard changes being directionally correct, but it does not prove which specific change was causal or establish measured MkI deadline margin.
 
-See `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md`.
+See:
 
-### Fallback if 0.4-1 still distorts
-
-If the exact 0.4-1 build still distorts after ModFX on physical MkI, stop tuning gain/limiting and move to a substantially cheaper SPACE topology:
-
-- two-line cross-coupled room instead of four-line FDN;
-- fewer SDRAM reads/writes;
-- no separate diffusion bank if possible;
-- preserve early echo identity, dark stereo movement and long-room control with a lower runtime footprint.
-
-That next step would directly test the remaining runtime/deadline hypothesis.
+- `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md`
+- `reports/lattice/2026-09-12_space-0.4-1-physical-pass.md`
 
 ## ECHO
 
@@ -140,14 +111,10 @@ ECHO remains historical rather than the preferred LATTICE delay stage.
 - each LATTICE processor must have obvious standalone musical identity;
 - multi-effect safety should come from correct local gain structure and bounded runtime/state behavior, not blanket attenuation;
 - CORE 0.3-1 and FIELD 0.1-2 are the current preferred MkI pair;
-- SPACE is a standalone reverb experiment and must be robust after ModFX even though it is not part of the preferred CORE → FIELD system;
+- SPACE 0.4-1 is now the current MkI SPACE reference and is usable after modulation with only a minor residual top-end artifact reported;
 - physical MkI evidence outranks host-model assumptions;
 - do not infer support for simultaneous user DELAY + user REVERB on original MkI.
 
 ## Next gate
 
-1. Physically test exact SPACE 0.4-1 standalone enough to confirm its current identity remains intact.
-2. Test one built-in ModFX → SPACE 0.4-1.
-3. Test CORE 0.3-1 → SPACE 0.4-1.
-4. If practical, test one other custom ModFX → SPACE 0.4-1.
-5. If distortion remains, note whether lowering source/input level materially changes it, then move directly to the lower-runtime two-line SPACE diagnostic.
+LATTICE CORE, FIELD and SPACE are now good enough to freeze for this MkI pass. Return to the suite-wide calibration backlog: delay/reverb perceived level, subtle ModFX identity, and IRONROT loudness consistency. Revisit SPACE only if the residual top-end distortion becomes musically significant in later use.
