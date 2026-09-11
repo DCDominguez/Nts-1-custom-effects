@@ -27,6 +27,7 @@ The A-class release-candidate pack was loaded and played on the physical origina
 
 Main findings:
 
+- **SPECTRA:** sounds great through 3 internal voices; the prior 4-voice setting degrades the sound. SPECTRA 0.2-1 therefore caps the MkI build at 3 voices and requires exact-build retest.
 - **Delay:** all tested delays work, but the family is generally too quiet; the NTS-1 main volume must be raised very high for an enjoyable listening level.
 - **Reverb:** all tested reverbs work; except for LATTICE SPACE they tested well musically, but the family is also generally too quiet.
 - **ModFX:** overall level consistency needs another pass. ASCENDER, ATTRACTOR and CAPSTAN are barely noticeable; IRONROT sounds great but can become quite loud.
@@ -92,7 +93,7 @@ Draft PR **#10** remains the current FIELD/LATTICE integration boundary into `la
 
 ## Oscillator
 
-- **SPECTRA** (`osc`) — four-voice swarm oscillator with waveform morphing, detune/interval constellations, independent drift and bounded per-note mutation.
+- **SPECTRA 0.2-1** (`osc`) — three-voice swarm oscillator with waveform morphing, detune/interval constellations, independent drift and bounded per-note mutation. The previous fourth voice was removed after physical MkI listening found the 1–3 voice range excellent but the 4-voice setting degraded the sound.
 
 The MkI oscillator API outputs one sample per frame, so SPECTRA is intentionally mono before the NTS-1 host filter/envelope/effects.
 
