@@ -2,7 +2,7 @@ name: Pre-handoff suite
 
 on:
   push:
-    branches: [ field-0.1-0-test ]
+    branches: [ field-0.1-0-test, lattice-runtime-optimization ]
     paths:
       - 'effects/**'
       - 'oscillators/**'
