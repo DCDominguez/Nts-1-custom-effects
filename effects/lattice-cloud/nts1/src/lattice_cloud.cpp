@@ -12,12 +12,18 @@ static const uint32_t kDiffMask = kDiffSize - 1u;
 static const uint32_t kFdnSize = 4096u;
 static const uint32_t kFdnMask = kFdnSize - 1u;
 static const float kParamSlew = 0.0012f;
-static const float kGuardCeiling = 0.90f;
 
-// SPACE 0.4 is deliberately cheaper and more direct than 0.3. The MkI
-// physical pass found 0.3 too subtle at full MIX and distorted when preceded
-// by modulation. One stereo diffusion stage now feeds a fixed four-line FDN;
-// DRIFT moves output geometry/damping instead of moving four delay heads.
+// SPACE 0.4-1 is a focused MkI combination-distortion diagnostic.
+// 0.4-0 still distorted whenever the tester placed SPACE after modulation.
+// The topology is intentionally retained so this revision isolates two
+// nonlinear/high-energy behaviors instead of redesigning the room again:
+//
+// 1. the sample-by-sample dynamic peak guard is removed entirely;
+// 2. FDN injection is reduced while wet readout remains strong.
+//
+// If this exact candidate becomes clean after ModFX, the old guard/internal
+// loop energy were materially involved. If it still distorts, the next step is
+// a lower-runtime/two-line architecture rather than further gain guessing.
 __sdram float s_pre_l[kPreSize];
 __sdram float s_pre_r[kPreSize];
 __sdram float s_diff_l[kDiffSize];
@@ -37,7 +43,11 @@ static float s_lp3 = 0.0f;
 static float s_body_l = 0.0f;
 static float s_body_r = 0.0f;
 static float s_phase = 0.0f;
-static float s_guard_gain = 1.0f;
+
+// Host-visible diagnostic counters. They cost only a conditional increment
+// when a safety bound is actually reached and make hidden clipping testable.
+static uint32_t s_feedback_clamps = 0u;
+static uint32_t s_output_clamps = 0u;
 
 static float s_space_target = 0.56f;
 static float s_drift_target = 0.28f;
@@ -45,9 +55,6 @@ static float s_mix_target = 0.34f;
 static float s_space = 0.56f;
 static float s_drift = 0.28f;
 static float s_mix = 0.34f;
-
-static inline float absf(float x) { return x < 0.0f ? -x : x; }
-static inline float maxf(float a, float b) { return a > b ? a : b; }
 
 static inline float clamp01(float x) {
   if (x < 0.0f) return 0.0f;
@@ -87,20 +94,27 @@ static inline float allpass(float x, float *buffer, uint32_t mask,
 }
 
 static inline float feedback_bound(float x) {
-  return clampf(x, -0.985f, 0.985f);
+  if (x > 0.985f) {
+    ++s_feedback_clamps;
+    return 0.985f;
+  }
+  if (x < -0.985f) {
+    ++s_feedback_clamps;
+    return -0.985f;
+  }
+  return x;
 }
 
-static inline void guard_pair(float &l, float &r) {
-  const float peak = maxf(absf(l), absf(r));
-  const float target = peak > kGuardCeiling ? (kGuardCeiling / peak) : 1.0f;
-  if (target < s_guard_gain) {
-    s_guard_gain = target;
-  } else {
-    s_guard_gain += (target - s_guard_gain) * 0.0012f;
-    if (s_guard_gain > 1.0f) s_guard_gain = 1.0f;
+static inline float output_bound(float x) {
+  if (x > 0.995f) {
+    ++s_output_clamps;
+    return 0.995f;
   }
-  l *= s_guard_gain;
-  r *= s_guard_gain;
+  if (x < -0.995f) {
+    ++s_output_clamps;
+    return -0.995f;
+  }
+  return x;
 }
 
 static void reset_state(void) {
@@ -125,7 +139,8 @@ static void reset_state(void) {
   s_lp0 = s_lp1 = s_lp2 = s_lp3 = 0.0f;
   s_body_l = s_body_r = 0.0f;
   s_phase = 0.0f;
-  s_guard_gain = 1.0f;
+  s_feedback_clamps = 0u;
+  s_output_clamps = 0u;
   s_space_target = s_space = 0.56f;
   s_drift_target = s_drift = 0.28f;
   s_mix_target = s_mix = 0.34f;
@@ -163,8 +178,8 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float early_r = e0_r * 0.62f + e1_r * 0.38f;
 
     const float diff_g = 0.48f + 0.07f * s_space;
-    const float diff_in_l = pd_l * 0.68f + early_l * 0.52f;
-    const float diff_in_r = pd_r * 0.68f + early_r * 0.52f;
+    const float diff_in_l = pd_l * 0.56f + early_l * 0.40f;
+    const float diff_in_r = pd_r * 0.56f + early_r * 0.40f;
     const float diff_l = allpass(diff_in_l, s_diff_l, kDiffMask,
                                  s_diff_write, 337u, diff_g);
     const float diff_r = allpass(diff_in_r, s_diff_r, kDiffMask,
@@ -175,9 +190,6 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float r2 = read_fixed(s_fdn2, s_fdn_write, kFdnMask, 2671u);
     const float r3 = read_fixed(s_fdn3, s_fdn_write, kFdnMask, 3433u);
 
-    // Larger SPACE values are deliberately less damped as well as more
-    // regenerative. The first 0.4 candidate changed feedback but kept the
-    // damping network too lossy for a meaningfully persistent large-room tail.
     const float damping = clampf(0.32f + 0.12f * s_space - 0.06f * s_drift,
                                  0.26f, 0.44f);
     s_lp0 += (r0 - s_lp0) * damping;
@@ -192,10 +204,14 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
 
     const float diff_mid = 0.5f * (diff_l + diff_r);
     const float diff_side = 0.5f * (diff_l - diff_r);
-    const float feedback = 0.50f + 0.42f * s_space;
-    const float inject = mid * 0.10f + diff_mid * (0.30f + 0.08f * s_space);
-    const float inject_side = side * (0.08f + 0.08f * s_drift) +
-                              diff_side * (0.16f + 0.08f * s_drift);
+
+    // Retain the long-room relationship but keep significantly more internal
+    // headroom than 0.4-0. Presence is recovered at readout, not by driving the
+    // feedback network harder.
+    const float feedback = 0.48f + 0.41f * s_space;
+    const float inject = mid * 0.055f + diff_mid * (0.20f + 0.05f * s_space);
+    const float inject_side = side * (0.045f + 0.045f * s_drift) +
+                              diff_side * (0.10f + 0.05f * s_drift);
 
     s_fdn0[s_fdn_write] = feedback_bound(inject + h0 * feedback);
     s_fdn1[s_fdn_write] = feedback_bound(inject_side + h1 * feedback);
@@ -212,21 +228,24 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     s_body_l += (tail_l - s_body_l) * 0.050f;
     s_body_r += (tail_r - s_body_r) * 0.050f;
 
-    const float early_voice = 0.28f + 0.18f * (1.0f - s_space);
-    const float tail_voice = 0.72f + 0.20f * s_space;
-    const float wet_l = early_l * early_voice + diff_l * 0.20f +
-                        tail_l * tail_voice + s_body_l * 0.18f;
-    const float wet_r = early_r * early_voice + diff_r * 0.20f +
-                        tail_r * tail_voice + s_body_r * 0.18f;
+    const float early_voice = 0.30f + 0.18f * (1.0f - s_space);
+    const float tail_voice = 0.82f + 0.20f * s_space;
+    const float wet_l = early_l * early_voice + diff_l * 0.18f +
+                        tail_l * tail_voice + s_body_l * 0.16f;
+    const float wet_r = early_r * early_voice + diff_r * 0.18f +
+                        tail_r * tail_voice + s_body_r * 0.16f;
 
     const float dry_gain = 1.0f - 0.88f * s_mix;
-    const float wet_gain = (0.78f + 0.30f * s_mix) * s_mix;
-    float out_l = in_l * dry_gain + wet_l * wet_gain;
-    float out_r = in_r * dry_gain + wet_r * wet_gain;
+    const float wet_gain = (0.76f + 0.24f * s_mix) * s_mix;
+    const float out_l = in_l * dry_gain + wet_l * wet_gain;
+    const float out_r = in_r * dry_gain + wet_r * wet_gain;
 
-    guard_pair(out_l, out_r);
-    xn[f * 2u] = clampf(out_l, -0.995f, 0.995f);
-    xn[f * 2u + 1u] = clampf(out_r, -0.995f, 0.995f);
+    // 0.4-0 used a sample-by-sample gain guard here. On complex ModFX output
+    // that guard could become an audible nonlinear amplitude processor. 0.4-1
+    // deliberately has no dynamic gain element; this clamp is emergency-only
+    // and its hit counter is asserted by host tests.
+    xn[f * 2u] = output_bound(out_l);
+    xn[f * 2u + 1u] = output_bound(out_r);
 
     s_pre_write = (s_pre_write + 1u) & kPreMask;
     s_diff_write = (s_diff_write + 1u) & kDiffMask;
