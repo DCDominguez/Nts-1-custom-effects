@@ -7,7 +7,7 @@
 - Work branch: `lattice-runtime-optimization`
 - Accepted controls remain unchanged: CORE 0.3-1, FIELD 0.1-2, SPACE 0.4-1, SPECTRA 0.2-1
 - New candidates: CORE 0.3-2, FIELD 0.1-3, SPACE 0.4-2, SPECTRA 0.2-2
-- Classification: **HOST/A-CLASS PASS; ARM BUILD AND PHYSICAL MKI CHECK REQUIRED**
+- Classification: **HOST/A-CLASS PASS; FRESH ARM BUILD PASS; PHYSICAL MKI A/B REQUIRED**
 
 This pass deliberately changes no gain constants, event timing, pitch/interval rules, feedback coefficients, mix laws, voice ceiling, control mapping, or effect topology. The current physical references remain the control group until the candidates pass on the original MkI.
 
@@ -67,15 +67,32 @@ CORE and SPECTRA were bit-identical in these comparisons. FIELD and SPACE differ
 
 These host results do not establish original-MkI callback margin or replace physical listening.
 
+## CI and ARM packaging result
+
+- Pre-handoff run: `34645183717` at branch head `1c78e10565c1645e346f330f7cf849d6743b79b6`
+- Fresh ARM build/package against the current official Korg logue SDK: **PASS**
+- All four LATTICE project-specific host tests: **PASS**
+- Suite-wide production DSP common gate: **PASS**
+- ARM artifact: `pre-handoff-arm-builds` (`10281397144`), digest `sha256:bc0f28b046206051731fc21497492af9994772b8a3edffee5b6155acaab7fe1e`
+
+The aggregate host job is marked failed only because the existing, unrelated GlitchRepeat `CHANCE=0` test failed. GlitchRepeat is not modified by this branch, and that failure does not invalidate the four passing LATTICE checks. It remains part of the separate physical-calibration batch.
+
+| Candidate | ARM text | ARM data | ARM bss | ARM total |
+| --- | ---: | ---: | ---: | ---: |
+| CORE 0.3-2 | 3,920 | 16 | 131,484 | 135,420 |
+| FIELD 0.1-3 | 4,916 | 40 | 139,956 | 144,912 |
+| SPACE 0.4-2 | 2,212 | 24 | 114,728 | 116,964 |
+| SPECTRA 0.2-2 | 5,424 | 1,080 | 120 | 6,624 |
+
+These image sizes are within the established project constraints. They are not CPU telemetry; the source-level work reduces repeated runtime calculations, while original-MkI listening remains the authority for callback margin and sound.
+
 ## Required gates
 
-1. Fresh ARM compile/package against the current official Korg logue SDK.
-2. Confirm manifest/API/category and image sizes.
-3. Focused original-MkI A/B against the accepted controls:
+1. Focused original-MkI A/B against the accepted controls:
    - CORE: upper TIME and maximum freeze, then CORE + FIELD;
    - FIELD: center controls, dense overlap, then CORE + FIELD;
    - SPACE: center/full MIX and the residual top-end region after CORE or another ModFX;
    - SPECTRA: three voices in each SHAPE region and one-to-three-voice switching.
-4. Promote individually. A failure in one candidate does not block the other three.
+2. Promote individually. A failure in one candidate does not block the other three.
 
 No release or replacement of the accepted reference line is claimed in this report.
