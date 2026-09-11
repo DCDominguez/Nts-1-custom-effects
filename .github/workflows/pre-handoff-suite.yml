@@ -1,0 +1,36 @@
+name: Pre-handoff suite
+
+on:
+  push:
+    branches: [ field-0.1-0-test ]
+    paths:
+      - 'effects/**'
+      - 'oscillators/**'
+      - 'tests/pre-handoff/**'
+      - '.github/workflows/pre-handoff-suite.yml'
+  pull_request:
+    paths:
+      - 'effects/**'
+      - 'oscillators/**'
+      - 'tests/pre-handoff/**'
+      - '.github/workflows/pre-handoff-suite.yml'
+  workflow_dispatch:
+
+jobs:
+  host-production-dsp:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run suite-wide production DSP common gate
+        run: |
+          python3 tests/pre-handoff/run_suite.py
+      - name: Publish result summary
+        if: always()
+        run: |
+          if [ -f tests/pre-handoff/results.md ]; then cat tests/pre-handoff/results.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-handoff-suite-results
+          path: tests/pre-handoff/results.md
