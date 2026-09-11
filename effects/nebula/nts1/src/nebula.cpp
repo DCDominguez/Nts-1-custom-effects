@@ -4,6 +4,7 @@
 namespace {
 
 static constexpr uint32_t N = 32768u;
+static constexpr float kWetOutputGain = 1.80f;
 static float bL[N] __sdram;
 static float bR[N] __sdram;
 static float ph[4] = {0.0f, 0.23f, 0.51f, 0.77f};
@@ -110,9 +111,10 @@ void REVFX_PROCESS(float *x, uint32_t n) {
     bL[w] = softsat(inL * 0.70f + wl * fb);
     bR[w] = softsat(inR * 0.70f + wrv * fb);
 
-    const float wet_gain = 0.78f;
-    const float outL = inL * (1.0f - m) + wl * (m * wet_gain);
-    const float outR = inR * (1.0f - m) + wrv * (m * wet_gain);
+    const float dry_gain = 1.0f - m * m;
+    const float wet_gain = m * kWetOutputGain;
+    const float outL = inL * dry_gain + wl * wet_gain;
+    const float outR = inR * dry_gain + wrv * wet_gain;
     x[2u * i] = ca(outL);
     x[2u * i + 1u] = ca(outR);
 
