@@ -13,6 +13,11 @@ OUT = ROOT / "tests" / "pre-handoff" / "unit-specific-results.md"
 CASES = [
     ("SPECTRA", TESTS / "test_spectra.cpp"),
     ("DUST", TESTS / "test_dust.cpp"),
+    ("CARRIER", TESTS / "test_carrier.cpp"),
+    ("VECTORFILTER", TESTS / "test_vectorfilter.cpp"),
+    ("ATTRACTOR", TESTS / "test_attractor.cpp"),
+    ("CHORDGHOST", TESTS / "test_chordghost.cpp"),
+    ("LATTICE CORE", TESTS / "test_lattice_core.cpp"),
 ]
 
 
