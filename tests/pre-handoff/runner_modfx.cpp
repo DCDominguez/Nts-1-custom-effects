@@ -33,6 +33,7 @@ static void process_block(const float* in,float* out,uint32_t frames,Stats& s){
   s.frames += frames;
 }
 static void setp(float a,float b){ MODFX_PARAM(k_user_modfx_param_time,q(a)); MODFX_PARAM(k_user_modfx_param_depth,q(b)); }
+static void fresh(float a,float b){ MODFX_INIT(0,0); MODFX_RESUME(); setp(a,b); }
 
 int main(int argc,char**argv){
   const char* name=argc>1?argv[1]:"modfx";
@@ -40,7 +41,9 @@ int main(int argc,char**argv){
   float in[B*2],out[B*2];
   Stats all;
 
-  MODFX_INIT(0,0); setp(0,0); MODFX_RESUME();
+  // Apply controls after RESUME: several production units intentionally reset
+  // their control state in RESUME, so setting params before RESUME would test defaults.
+  fresh(0,0);
   for(uint32_t block=0;block<375;++block){
     std::fill(in,in+B*2,0.0f); std::fill(out,out+B*2,0.0f); Stats s; process_block(in,out,B,s);
     if(s.peak>1.0e-5f) die("silence generates unintended output");
@@ -50,8 +53,10 @@ int main(int argc,char**argv){
   double best_diff=0;
   const float vals[3]={0.0f,0.5f,1.0f};
   for(float a:vals) for(float b:vals){
-    MODFX_INIT(0,0); setp(a,b); MODFX_RESUME(); Stats s; uint64_t n=0;
-    for(uint32_t block=0;block<375;++block){
+    fresh(a,b); Stats s; uint64_t n=0;
+    // 1.5 s gives history/capture-based ModFX (notably LATTICE CORE)
+    // enough time to cross their deliberate warm-up region.
+    for(uint32_t block=0;block<1125;++block){
       for(uint32_t i=0;i<B;++i,++n){ float l=tone(n,220,.42f),r=.73f*tone(n,329.63f,.42f); in[2*i]=l; in[2*i+1]=r; }
       process_block(in,out,B,s);
     }
@@ -60,8 +65,8 @@ int main(int argc,char**argv){
   check(best_diff>1.0e-5,"no measurable effect behavior across parameter grid");
   std::printf("PASS parameter grid; max mean |wet-dry| %.8f\n",best_diff);
 
-  MODFX_INIT(0,0); setp(1,1); MODFX_RESUME(); Stats hot; uint64_t n=0;
-  for(uint32_t block=0;block<750;++block){
+  fresh(1,1); Stats hot; uint64_t n=0;
+  for(uint32_t block=0;block<1125;++block){
     for(uint32_t i=0;i<B;++i,++n){ float x=.72f*tone(n,110,.95f)+.28f*noise(.95f); x=std::max(-.98f,std::min(.98f,x)); in[2*i]=x; in[2*i+1]=-.61f*x+.15f*noise(.5f); }
     process_block(in,out,B,hot);
   }
@@ -69,13 +74,13 @@ int main(int argc,char**argv){
 
   MODFX_INIT(0,0); MODFX_RESUME(); Stats sweep; n=0;
   const auto t0=std::chrono::steady_clock::now();
-  for(uint32_t block=0;block<1500;++block){
+  for(uint32_t block=0;block<3000;++block){
     float p=(block%200)/199.0f; if((block/200)&1u) p=1.0f-p; setp(p,1.0f-p*.73f);
     for(uint32_t i=0;i<B;++i,++n){ float x=(block%7==0)?noise(.5f):tone(n,55.0f+330.0f*p,.5f); in[2*i]=x; in[2*i+1]=(block&1)?-.7f*x:.7f*x; }
     process_block(in,out,B,sweep);
   }
   const auto us=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-t0).count();
-  std::printf("PASS sweep/soak; peak %.6f; host %.3f us/block\n",sweep.peak,double(us)/1500.0);
+  std::printf("PASS sweep/soak; peak %.6f; host %.3f us/block\n",sweep.peak,double(us)/3000.0);
 
   MODFX_SUSPEND(); MODFX_RESUME(); Stats reset;
   for(uint32_t block=0;block<150;++block){ std::fill(in,in+B*2,0.0f); process_block(in,out,B,reset); }
