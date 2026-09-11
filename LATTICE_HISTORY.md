@@ -732,3 +732,6 @@ See `reports/lattice/2026-09-10_field-0.1-0-build.md` for actual test/build evid
 DC clarified that isolated and subsequent notes did produce audible delay, but it was faint and remained below the desired prominence following the higher-MIX check. Earlier assumptions of a missing trigger were superseded by that correction. The proposed capture redesign was put on hold.
 
 DC approved a focused +6 dB boost to the four main echoes, retaining pitched ghost levels, bloom sends and finite-phrase behavior. FIELD 0.1-1 applies this boost only in the clear foreground sum before existing wet protection. CORE remains 0.3-0. See the 0.1-1 build/result reports for test evidence. Hardware acceptance is still open.
+
+## 2026-09-11 — response delivery before hardware handoff
+The 0.1-1 audit reproduced replacement starvation: 24 captures but no echoes during six seconds of busy input at slow CLOCK. DC approved clocked recapture and first-answer protection, plus the three-layer test protocol. The durable lesson is to test audible response delivery, not admission counts alone. With two capture buffers and long delay intervals, busy input must be selectively skipped to preserve an admitted first answer. Other audit findings remain explicitly deferred.

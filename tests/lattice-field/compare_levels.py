@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 
 root = pathlib.Path(__file__).resolve().parents[2]
-old_commit = 'b8e9e3fd14997019cd45423fc54bdbc50b9ee128'
+old_commit = '5179491c69d74be15b3c79aaa06962368bf35387'
 source = 'effects/lattice-field/nts1/src/lattice_field.cpp'
 with tempfile.TemporaryDirectory(prefix='field-levels-') as work:
     work = pathlib.Path(work)
@@ -28,10 +28,12 @@ with tempfile.TemporaryDirectory(prefix='field-levels-') as work:
             old,new=rows
             gain=20*math.log10(new[1]/old[1])
             assert new[5]==0 and new[0]<1, 'clipped test output'
-            assert old[6:9]==new[6:9], 'admission, events or bloom changed'
+            if not overlap:
+                assert old == new, 'isolated response changed from 0.1-1'
             if amp<=.4:
-                assert 5.8<gain<6.2, 'ordinary first response did not gain approximately 6 dB'
+                if not overlap:
+                    assert abs(gain)<.01, 'isolated first response gain changed'
                 assert new[4]==0, 'ordinary source invokes wet guard'
             print(f'{amp:.2f} {overlap} {gain:.3f} {old[3]:.4f} {new[3]:.4f} {old[0]:.4f} {new[0]:.4f} {int(new[4])}')
-    print('PASS: ordinary first answers +6 dB; zero clipped samples; admission/events/bloom identical.')
+    print('PASS: isolated 0.1-1 responses identical; dense inputs bounded without ordinary-level guard hits.')
     print('Loud-input gain is guard-limited. Desktop checks do not establish audible hardware pumping or CPU margin.')

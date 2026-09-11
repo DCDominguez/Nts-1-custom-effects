@@ -77,3 +77,11 @@ When a regression or new milestone is tested, record exact build/commit where po
 - M3 is allowed only for units whose M2 gate has passed.
 
 See [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the original suite-level validation record and GitHub Issues #7 and #8 for the active retest gates.
+
+## Required testing layers before hardware handoff (2026-09-11)
+
+1. Internal correctness: run actual DSP through isolated, legato, dense and quiet/soft inputs; verify delivered responses during playing, capture ownership, expiry, clock/control transitions, ABI identifiers, bounded output and silence. A high capture count alone is not success. Cover every mode/division where scheduling changes. Document known failures and omissions; ordinary level checks and peak guards do not prove musical quality.
+2. Device integration/runtime: only a physical MkI can establish loading, actual knob/clock/source behavior, processing deadlines and CORE + FIELD coexistence. Compilation/memory fit and desktop speed are not hardware runtime validation.
+3. Musical judgment: DC evaluates echo presence, bloom, articulation and performance feel. Offline rendered examples and an optional dry recording of a failing input can shorten iteration; never require a recording before useful internal work. Synthetic input is not proof of the exact hardware cause.
+
+Every handoff identifies the build, automated evidence, known limitations, and only the remaining device/listening checks. Reproduce deterministic failures internally before another device build. Preserve hardware feedback literally and distinguish inference. Pause for DC before additional unapproved improvements. Retain BUILD ONLY until physical validation.

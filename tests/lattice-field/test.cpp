@@ -32,7 +32,7 @@ int main() {
   // Every division/mode terminates with no spontaneous recapture or stuck voice.
   for (uint32_t d=0;d<8;++d) for (uint32_t m=0;m<4;++m) {
     DELFX_INIT(0,0); params((d+.5f)/8,(m+.5f)/4,1); DELFX_RESUME();
-    for (uint32_t n=0;n<6000;++n) frame(tone(n),tone(n));
+    for (uint32_t n=0;n<1920;++n) frame(tone(n),tone(n));
     const uint32_t count=admitted;
     float wetPeak=0;
     const uint32_t duration=12*tickFor(d)+12*SR;
@@ -47,13 +47,14 @@ int main() {
     if (d<2) check(maxLive<=4,"fast subdivision voice budget");
   }
   std::puts("PASS all 32 mode/division lifecycles, wet audibility and rest");
-  // Held tone never gets a time-based recapture.
+  // Held tone is intentionally sampled at clocked intervals.
   DELFX_INIT(0,0); params(.56f,.1f,.5f); DELFX_RESUME();
   for (uint32_t n=0;n<12*SR;++n) frame(tone(n),tone(n));
-  check(admitted==1,"held tone does not replenish seeds");
+  check(admitted>10,"held tone receives clocked captures");
+  const uint32_t heldCount=admitted;
   silence(SR/2);
   for (uint32_t n=0;n<6000;++n) frame(tone(n),tone(n));
-  check(admitted==2,"release and rearm accepts new note");
+  check(admitted>heldCount,"release and rearm accepts new note");
   std::puts("PASS sustained source and rearm");
   // Deadline remains fixed through knob/tempo changes and uint32 wrap.
   DELFX_INIT(0,0); now=0xfffff000u; params(.05f,.1f,.5f); DELFX_RESUME(); now=0xfffff000u;
@@ -76,6 +77,48 @@ int main() {
   check(admitted>10,"dense input still admits new notes");
   silence(50*SR); check(!liveCount(),"dense sequence terminates");
   std::puts("PASS dense replacement and control sweeps");
+  // Busy playing must deliver complete first answers, including slow CLOCK.
+  for (uint32_t d=0;d<8;++d) for(uint32_t m=0;m<4;++m) {
+    DELFX_INIT(0,0); params((d+.5f)/8,(m+.5f)/4,1); DELFX_RESUME();
+    uint32_t completed=0; float playingPeak=0;
+    for(uint32_t n=0;n<6*SR;++n) {
+      uint32_t ids[2]; bool done[2]; State states[2];
+      for(unsigned j=0;j<2;++j){ids[j]=seeds[j].id;done[j]=seeds[j].firstDone;states[j]=seeds[j].state;}
+      const float x=n%12000<4800?tone(n):0;
+      playingPeak=std::max(playingPeak,frame(x,x));
+      for(unsigned j=0;j<2;++j){
+        if(seeds[j].id==ids[j]&&!done[j]&&seeds[j].firstDone) ++completed;
+        if(seeds[j].id!=ids[j]&&states[j]!=Empty)
+          check(done[j],"replacement waits for first answer completion");
+      }
+    }
+    check(completed>=2,"busy input delivers first answers while playing");
+    check(playingPeak>.08f,"busy input has audible wet output");
+    silence(50*SR);check(!liveCount(),"busy input finite rest");
+  }
+  std::puts("PASS 32 busy mode/division cases: completed first answers and wet delivery");
+  // Legato C-D-E: identify source pitch of sounding FIRST responses and ensure
+  // actual wet output during each; zero crossings suffice for these pure tones.
+  DELFX_INIT(0,0);params(.56f,.1f,1);DELFX_RESUME();
+  bool heard[3]={false,false,false};
+  for(uint32_t n=0;n<3*SR;++n){
+    const float hz=n<24000?261.6256f:n<48000?293.6648f:329.6276f;
+    const float x=n<72000?tone(n,hz):0;
+    const float out=frame(x,x);
+    for(unsigned v=0;v<VOICES;++v) if(voices[v].active&&voices[v].first&&out>.04f){
+      const Seed &seed=seeds[voices[v].seed]; unsigned crossings=0;
+      for(unsigned k=1;k<seed.length;++k)
+        if(capture[voices[v].seed][0][k-1]<=0&&capture[voices[v].seed][0][k]>0)++crossings;
+      const float estimate=crossings*float(SR)/seed.length;
+      const float pitches[3]={261.6256f,293.6648f,329.6276f};
+      for(unsigned k=0;k<3;++k)if(std::fabs(estimate-pitches[k])<13)heard[k]=true;
+    }
+  }
+  check(heard[0]&&heard[1]&&heard[2],"C D and E each reach audible first playback");
+  std::puts("PASS legato C-D-E audible first responses");
+  // Use literal ABI identifiers, not just the same enum on both sides.
+  DELFX_INIT(0,0);DELFX_PARAM(2,0);check(mixTarget==.5f,"reserved ID leaves MIX unchanged");
+  DELFX_PARAM(3,0);check(mixTarget==0,"Korg ABI ID 3 controls MIX");
   // Bad host tempo/input and corrupt individual voice cannot poison dry/output.
   DELFX_INIT(0,0); test_bpm=std::numeric_limits<float>::quiet_NaN();
   for(uint32_t n=0;n<6000;++n) frame(tone(n),tone(n));

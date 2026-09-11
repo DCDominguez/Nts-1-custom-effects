@@ -22,7 +22,7 @@ jobs:
           mkdir -p artifacts
           g++ -std=c++11 -O1 -g -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer -I tests/lattice-field/stubs tests/lattice-field/test.cpp -o /tmp/field-test
           /tmp/field-test | tee artifacts/HOST-TESTS.txt
-      - name: Compare approved level change against 0.1-0
+      - name: Check isolated levels and dense headroom against 0.1-1
         run: python3 tests/lattice-field/compare_levels.py | tee artifacts/LEVEL-COMPARISON.txt
       - name: Install ARM toolchain
         run: |
@@ -69,21 +69,22 @@ jobs:
               print('Verified unit ZIP:', p)
           PY
           cp effects/lattice-field/README.md artifacts/FIELD-README.md
-          cp effects/lattice-field/docs/qa-0.1-1.md artifacts/START-HERE-HARDWARE-QA.md
+          cp effects/lattice-field/docs/qa-0.1-2.md artifacts/START-HERE-HARDWARE-QA.md
           cp effects/lattice-field/docs/qa-0.1-0.md artifacts/FULL-HARDWARE-QA.md
+          cp LATTICE_REPORTING.md artifacts/
           cp LATTICE_FIELD_SPEC.md artifacts/
-          cp reports/lattice/2026-09-10_field-0.1-1-build.md artifacts/
+          cp reports/lattice/2026-09-11_field-0.1-2-build.md artifacts/
           {
             echo "Project commit: $GITHUB_SHA"
             echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
             echo "Korg SDK: $(git -C logue-sdk rev-parse HEAD)"
             arm-none-eabi-gcc --version | head -1
-            echo "FIELD 0.1-1; CORE 0.3-0 unchanged; HARDWARE NOT VALIDATED"
+            echo "FIELD 0.1-2; CORE 0.3-0 unchanged; HARDWARE NOT VALIDATED"
           } > artifacts/BUILD-PROVENANCE.txt
           (cd artifacts && sha256sum field/*.ntkdigunit core/*.ntkdigunit > SHA256SUMS.txt)
       - uses: actions/upload-artifact@v4
         with:
-          name: LATTICE-FIELD-0.1-1-Hardware-Test
+          name: LATTICE-FIELD-0.1-2-Hardware-Test
           path: artifacts/
           if-no-files-found: error
           retention-days: 30

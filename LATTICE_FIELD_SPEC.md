@@ -1,3 +1,5 @@
+> **Implemented 0.1-2 amendment (2026-09-11):** Supersedes earlier attack-only/no-held-recapture rules below. Fresh attacks plus CLOCK-spaced captures (120 ms minimum) while input qualifies. Two owned captures; no replacement until the first clear answer completes. Busy input may be skipped; later phrase events may be retired. Each admitted deadline is fixed; sustained input including CORE freeze can replenish phrases. Gain, bloom, modes and response offsets remain as in 0.1-1. See FIELD README and the 0.1-2 build report for limitations.
+
 # LATTICE FIELD — Next Build Specification
 
 **Project:** Human Soon Studio / NTS-1 Custom Effects  

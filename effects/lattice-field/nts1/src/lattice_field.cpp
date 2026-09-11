@@ -1,7 +1,7 @@
 #include "userdelfx.h"
 #include <stdint.h>
 
-// FIELD 0.1-1: +6 dB clear answers; capture, ghosts and bloom sends unchanged.
+// FIELD 0.1-2: clocked recapture with protection through first-answer completion.
 // No allocation, moving delay heads, or wet-to-capture routing.
 namespace {
 const uint32_t SR = 48000u;
@@ -18,17 +18,17 @@ struct Seed {
   State state;
   uint32_t id, born, deadline, tick, length, written, next, event;
   uint32_t mode, limit, retire;
-  bool replace;
+  bool replace, firstDone;
 };
 struct Voice {
-  bool active, ghost, reverse;
+  bool active, ghost, reverse, first;
   uint32_t seed, id, age, length, fade, born;
   float position, ratio, level, panL, panR, send, lpL, lpR;
 };
 Seed seeds[SEEDS];
 Voice voices[VOICES];
 uint32_t now, historyWrite, fieldWrite, diffWrite, serial;
-uint32_t refractory, quietSamples, samplesSinceSend;
+uint32_t refractory, recaptureWait, quietSamples, samplesSinceSend;
 float fastEnv, slowEnv;
 bool attackArmed, gateArmed;
 float clockTarget = 0.56f, modeTarget = 0.10f, mixTarget = 0.50f;
@@ -81,19 +81,24 @@ void startCapture(uint32_t slot) {
   s.written = s.event = 0u;
   // Snapshot at admission: knob/tempo changes cannot extend this deadline.
   s.deadline = now + 10u * s.tick + FRAGMENT;
-  s.replace = false;
+  s.replace = false; s.firstDone = false;
 #ifdef LATTICE_TEST
   ++admitted;
 #endif
 }
-void admit() {
+bool admit() {
   for (uint32_t i = 0; i < SEEDS; ++i) {
-    if (seeds[i].state == Empty) { startCapture(i); return; }
+    if (seeds[i].state == Empty) { startCapture(i); return true; }
   }
-  // Do not repeatedly restart retirement while an old capture is draining.
-  if (seeds[0].state == Retiring || seeds[1].state == Retiring) return;
-  const uint32_t older = (now - seeds[0].born >= now - seeds[1].born) ? 0u : 1u;
-  retire(older, true);
+  if (seeds[0].state == Retiring || seeds[1].state == Retiring) return false;
+  int older = -1;
+  for (uint32_t i = 0; i < SEEDS; ++i) {
+    if (!seeds[i].firstDone) continue;
+    if (older < 0 || now-seeds[i].born > now-seeds[older].born) older = i;
+  }
+  if (older < 0) return false; // skip input; never erase an unheard phrase
+  retire(static_cast<uint32_t>(older), true);
+  return true;
 }
 uint32_t eventOffset(const Seed &s, uint32_t event) {
   // Six audible events: four clear answers, fifth/octave ghosts.
@@ -121,7 +126,7 @@ int voiceFor(bool ghost, uint32_t limit) {
   int victim = -1;
   for (uint32_t i = 0; i < VOICES; ++i) {
     const Voice &v = voices[i];
-    if (!v.active) continue;
+    if (!v.active || v.first) continue;
     if (v.fade) return -2; // retirement is already making room
     if (victim < 0 || (v.ghost && !voices[victim].ghost) ||
         (v.ghost == voices[victim].ghost && v.level < voices[victim].level)) victim = static_cast<int>(i);
@@ -142,7 +147,7 @@ bool spawn(uint32_t slot) {
   if (index == -2) return false;
   if (index == -1) return true; // consume an omitted ghost, never postpone expiry
   Voice &v = voices[index];
-  v = Voice(); v.active = true; v.ghost = ghost; v.seed = slot; v.id = s.id; v.born = now;
+  v = Voice(); v.first = e == 0u; v.active = true; v.ghost = ghost; v.seed = slot; v.id = s.id; v.born = now;
   v.ratio = e == 4u ? 1.49830708f : (e == 5u ? 2.0f : 1.0f);
   v.reverse = s.mode == 1u;
   uint32_t sourceLength = s.length;
@@ -262,7 +267,7 @@ void reset() {
     for (uint32_t j = 0; j < FDN; ++j) field[c][j] = 0;
     damping[c] = dcIn[c] = dcOut[c] = 0;
   }
-  now = historyWrite = fieldWrite = diffWrite = serial = refractory = quietSamples = 0;
+  now = historyWrite = fieldWrite = diffWrite = serial = refractory = recaptureWait = quietSamples = 0;
   samplesSinceSend = 8u * SR; fastEnv = slowEnv = motion = 0; bloomGain = 0.72f;
   attackArmed = gateArmed = true;
   mixValue = mixTarget;
@@ -293,14 +298,21 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
     fastEnv += (energy-fastEnv) * 0.002f;
     slowEnv += (energy-slowEnv) * 0.00015f;
     if (refractory) --refractory;
+    if (recaptureWait) --recaptureWait;
     if (fastEnv < 0.003f) {
       if (quietSamples < 960u) ++quietSamples;
       if (quietSamples >= 960u) gateArmed = true;
     } else quietSamples = 0;
     if (fastEnv < slowEnv * 1.15f + 0.003f) attackArmed = true;
     const bool attack = attackArmed && fastEnv > slowEnv * 1.8f + 0.006f;
-    if (!refractory && fastEnv > 0.008f && (attack || gateArmed)) {
-      admit(); refractory = 5760u; attackArmed = gateArmed = false;
+    // CLOCK-spaced sampling also accepts legato input. The 120 ms floor
+    // bounds admission work at fast divisions. Rejected input is not queued.
+    if (!refractory && fastEnv > 0.008f && (attack || gateArmed || !recaptureWait)) {
+      admit();
+      recaptureWait = tickFor(zone(clockTarget, 8u));
+      if (recaptureWait < 5760u) recaptureWait = 5760u;
+      refractory = 5760u;
+      attackArmed = gateArmed = false;
     }
     serviceSeeds();
     historyWrite = (historyWrite + 1u) & (HISTORY - 1u);
@@ -332,7 +344,10 @@ void DELFX_PROCESS(float *xn, uint32_t frames) {
       else { frontL+=l; frontR+=r; ++fronts; }
       sendL += l * v.send; sendR += r * v.send; ++sounding;
       v.position += v.reverse ? -v.ratio : v.ratio;
-      if (++v.age >= v.length) v.active = false;
+      if (++v.age >= v.length) {
+        if (v.first) seeds[v.seed].firstDone = true;
+        v.active = false;
+      }
     }
     static const float reciprocal[9] = {1, 1, .5f, 1.0f/3, .25f, .2f, 1.0f/6, 1.0f/7, .125f};
     const float nf = reciprocal[fronts];
