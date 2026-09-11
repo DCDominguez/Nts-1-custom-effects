@@ -101,6 +101,7 @@ Final workflow:
 
 - `Pre-handoff suite`
 - run **34605006118**
+- source head for the successful run: `c8383439e873f80b66bc2957909484abc297bdb8`
 - `host-production-dsp`: PASS
 - `arm-build-package`: PASS
 
@@ -108,7 +109,12 @@ Final result:
 
 **all 29 tracked units freshly compile and package against the current official Korg logue SDK used at CI runtime.**
 
-The workflow records text/data/BSS sizes and uploads the resulting `.ntkdigunit` set as the `pre-handoff-arm-builds` artifact.
+Artifacts from successful run 34605006118:
+
+- `pre-handoff-arm-builds` — artifact ID **10265569317**, SHA-256 `a986a3c81da6e114143616e814d9b0993c98e033b02d54ce359a4b6e4a9a486d`
+- `pre-handoff-suite-results` — artifact ID **10265244525**, SHA-256 `b138f16805971254d243b44814639ad8bc10fa279ce880eee8271dbb5cab5d3c`
+
+The ARM artifact contains the freshly generated `.ntkdigunit` set and build-size report.
 
 ## What this does and does not certify
 
