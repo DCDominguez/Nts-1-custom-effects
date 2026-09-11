@@ -28,6 +28,7 @@ Tester rule: units not explicitly called out in the physical notes **loaded prop
 
 Physical findings do not change the A engineering grade, but they do change the separate hardware/music status:
 
+- SPECTRA: sounds great through 3 voices; the 4-voice setting degrades the sound. MkI release line is now capped at 3 voices in 0.2-1; exact new binary requires load retest.
 - Delay family: functional/musical PASS with family-wide low perceived output level.
 - Reverb family except LATTICE SPACE: functional/musical PASS with family-wide low perceived output level.
 - ASCENDER / ATTRACTOR / CAPSTAN: functional PASS; effect is too subtle and needs musical audibility tuning.
@@ -55,7 +56,7 @@ Those remain separate hardware/music statuses.
 
 | Unit | Type | Engineering coverage | Latest physical/music note |
 |---|---|---:|---|
-| SPECTRA | osc | **A** | latest RC: load/runtime/music PASS |
+| SPECTRA | osc | **A** | prior RC: 1–3 voices sound great; 4 voices musical FAIL. 0.2-1 caps at 3 and needs exact-build load retest |
 | PARALLAX | delfx | **A** | latest RC: load/runtime/music PASS; musically backburnered by design history |
 | CHORDGHOST | delfx | **A** | latest RC: load/runtime/music PASS; delay family level retune pending |
 | DUST | modfx | **A** | latest RC: load/runtime/music PASS |
