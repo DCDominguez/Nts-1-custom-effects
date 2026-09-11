@@ -73,6 +73,8 @@ int main() {
   auto count_transitions = [&](float rate) {
     MODFX_INIT(0,0);
     settle(rate, 1.0f);
+    std::fprintf(stderr, "DUST settle target=%.3f s_rate=%.6f s_damage=%.6f capture=%.6f\n",
+                 rate, s_rate, s_damage, capture_rate(s_rate));
     auto y = process_mono(deterministic_noise(32768));
     return hs_measure::transition_count(hs_measure::channel(y,0), 1e-5);
   };
