@@ -19,6 +19,13 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 
 ### Specific notes
 
+#### SPECTRA
+
+- Prior 0.2-0 hardware result: 1–3 voices sounded great; 4 voices degraded the sound.
+- SPECTRA was therefore revised to **0.2-1**, capped at three internal voices.
+- Exact SPECTRA 0.2-1 follow-up: tester reported **“spectra runs great.”**
+- Current disposition: **LOAD / RUNTIME / MUSICAL PASS** for the reported 0.2-1 playing test; three voices is the approved MkI maximum.
+
 #### Reverb
 
 - **LATTICE SPACE** — very subtle even at full MIX; echo/spatial behavior is audible, but it distorts when run with modulation. **Redesign/revoice candidate.**
@@ -48,7 +55,7 @@ This physical report is separate from the repository's A-class engineering grade
 
 Any DSP change made to address level, identity or distortion reopens the physical gate for that exact changed candidate.
 
-See `reports/testing/2026-09-12_a-class-rc-physical-mki.md` and `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`.
+See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`, `reports/testing/2026-09-12_spectra-three-voice-cap.md`, and `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`.
 
 ---
 
