@@ -16,6 +16,48 @@ For the next-stage plan for active projects, see **[M2–M4 Milestones](MILESTON
 
 See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
+## LATTICE — active MkI system development
+
+LATTICE is the current Human Soon generative phrase-and-space system for the original NTS-1 MkI.
+
+Preferred architecture:
+
+```text
+AUDIO IN / OSC
+      ↓
+LATTICE CORE   [custom MOD]
+      ↓
+LATTICE FIELD  [custom DELAY]
+      ↓
+optional Korg built-in REVERB only
+      ↓
+OUTPUT
+```
+
+The earlier three-custom-unit CORE + ECHO + SPACE architecture is historical and no longer the preferred MkI target.
+
+### Current LATTICE state
+
+- **CORE 0.3-0** — composer / microloop / freeze processor. Physical MkI testing shows distortion around the user's approximate **3 o'clock and higher** TIME region; lowering source level did not remove it. High-TIME hardware validation remains open.
+- **FIELD 0.1-2** — finite clocked phrase + spatial bloom processor. Standalone listening behavior was reported as playing exactly as intended; overall hardware validation remains open.
+- **Corrosion + FIELD** — reported clean in the tested playing context.
+- **CORE + FIELD** — **FAIL / RETEST**; currently the supported pairing with the strongest reported distortion.
+- **Albedo + FIELD** — not treated as a supported simultaneous pair on MkI because user DELAY and user REVERB share the first-generation SDK memory regions.
+- **CORE 0.3-1** — proposed runtime diagnostic only; not implemented. The proposal caps ordinary microloop playback at 10 voices and suspends ordinary microloop work during full freeze.
+
+Compile/CI success is not hardware validation. The current physical MkI evidence remains authoritative.
+
+For current LATTICE work, read in this order:
+
+1. [`LATTICE_CURRENT_STATUS.md`](LATTICE_CURRENT_STATUS.md) — fastest current-state snapshot
+2. [`LATTICE_SYSTEM.md`](LATTICE_SYSTEM.md) — current architecture and doctrine
+3. [`LATTICE_HISTORY.md`](LATTICE_HISTORY.md) — full historical context and engineering lessons
+4. [`LATTICE_FIELD_SPEC.md`](LATTICE_FIELD_SPEC.md) — FIELD design/implementation guardrails
+5. [`LATTICE_REPORTING.md`](LATTICE_REPORTING.md) — mandatory update-reporting protocol
+6. [`reports/lattice/`](reports/lattice/) — chronological build, CI, diagnosis and hardware reports
+
+Draft PR **#10** remains the active FIELD integration boundary into `lattice-suite` while CORE/FIELD hardware validation is unresolved.
+
 ## Oscillator
 
 - **SPECTRA** (`osc`) — four-voice swarm oscillator with waveform morphing, detune/interval constellations, independent drift and bounded per-note mutation.
