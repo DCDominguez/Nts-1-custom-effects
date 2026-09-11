@@ -4,15 +4,20 @@
 
 Physical original-NTS-1 MkI listening feedback from the A-class release-candidate test.
 
-Tester report:
+Initial tester report:
 
 > SPECTRA works perfectly, but at four voices it starts becoming bad. Limit it to three voices. Overall it sounds great.
 
+Follow-up exact-build report after loading SPECTRA 0.2-1:
+
+> spectra runs great.
+
 ## Physical interpretation
 
-- 1–3 voices: **MUSICAL PASS** for the reported playing test.
+- 1–3 voices: **MUSICAL PASS** for the reported playing tests.
 - 4 voices in the prior 0.2-0 architecture: **MUSICAL FAIL / RETUNE**.
 - Overall SPECTRA identity/tone: strongly positive physical report.
+- Exact SPECTRA 0.2-1 binary: **LOAD / RUNTIME / MUSICAL PASS** for the reported playing test.
 - This is a musical/hardware constraint, not a desktop numerical-safety failure.
 
 ## Decision
@@ -57,11 +62,6 @@ Extracted SPECTRA 0.2-1 `.ntkdigunit` SHA-256:
 
 ## Current validation state
 
-Classification: **ENGINEERING PASS / PHYSICAL RETEST REQUIRED**.
+Classification: **A-CLASS ENGINEERING PASS + PHYSICAL MKI PASS** for the reported SPECTRA 0.2-1 playing test.
 
-The prior hardware report is sufficient to establish that three voices are preferred and four voices should be removed. Because the production binary changed, the new 0.2-1 exact build still needs a brief MkI load/select/music regression:
-
-1. load/select successfully;
-2. confirm Voices exposes only 1–3;
-3. confirm Voices 1, 2 and 3 retain the approved tone/musicality;
-4. confirm no new note-transition, level or aliasing defect.
+The MkI release line is now three voices maximum. No further SPECTRA correction is required from this finding unless later regression testing reports a new defect.
