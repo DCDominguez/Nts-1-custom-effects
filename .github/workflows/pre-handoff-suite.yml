@@ -23,16 +23,21 @@ jobs:
       - uses: actions/checkout@v4
       - name: Run suite-wide production DSP common gate
         run: python3 tests/pre-handoff/run_suite.py
+      - name: Run project-specific A-class harnesses
+        run: python3 tests/pre-handoff/run_unit_specific.py
       - name: Publish result summary
         if: always()
         run: |
           if [ -f tests/pre-handoff/results.md ]; then cat tests/pre-handoff/results.md >> "$GITHUB_STEP_SUMMARY"; fi
-      - name: Upload test report
+          if [ -f tests/pre-handoff/unit-specific-results.md ]; then cat tests/pre-handoff/unit-specific-results.md >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: pre-handoff-suite-results
-          path: tests/pre-handoff/results.md
+          path: |
+            tests/pre-handoff/results.md
+            tests/pre-handoff/unit-specific-results.md
 
   arm-build-package:
     runs-on: ubuntu-22.04
