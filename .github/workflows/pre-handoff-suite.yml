@@ -53,7 +53,7 @@ jobs:
           printf '| Unit | Module | text | data | bss | total |\n|---|---|---:|---:|---:|---:|\n' >> prehandoff-build/ARM_BUILD_RESULTS.md
 
           build_one() {
-            local name="$1" source="$2" module="$3" template="$4"
+            local name="$1" source="$2" module="$3" template="$4" out="${5:-$1}"
             local target="logue-sdk/platform/nutekt-digital/${name}"
             cp -a "logue-sdk/platform/nutekt-digital/${template}" "$target"
             cp "${source}/manifest.json" "$target/manifest.json"
@@ -61,9 +61,9 @@ jobs:
             mkdir -p "$target/src"
             cp -a "${source}/src/." "$target/src/"
             (cd "$target" && make GCC_BIN_PATH=/usr/bin && make GCC_BIN_PATH=/usr/bin install)
-            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${name}.elf" | tail -n 1)"
+            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${out}.elf" | tail -n 1)"
             printf '| %s | `%s` | %s | %s | %s | %s |\n' "$name" "$module" "$text" "$data" "$bss" "$dec" >> prehandoff-build/ARM_BUILD_RESULTS.md
-            cp "$target/${name}.ntkdigunit" prehandoff-build/binaries/
+            cp "$target/${out}.ntkdigunit" prehandoff-build/binaries/
           }
 
           build_one spectra oscillators/spectra/nts1 osc dummy-osc
@@ -91,10 +91,10 @@ jobs:
           build_one abyss effects/abyss/nts1 revfx dummy-revfx
           build_one aureole effects/aureole/nts1 revfx dummy-revfx
           build_one nebula effects/nebula/nts1 revfx dummy-revfx
-          build_one lattice-core effects/lattice-core/nts1 modfx dummy-modfx
-          build_one lattice-echo effects/lattice-echo/nts1 delfx dummy-delfx
-          build_one lattice-cloud effects/lattice-cloud/nts1 revfx dummy-revfx
-          build_one lattice-field effects/lattice-field/nts1 delfx dummy-delfx
+          build_one lattice-core effects/lattice-core/nts1 modfx dummy-modfx lattice_core
+          build_one lattice-echo effects/lattice-echo/nts1 delfx dummy-delfx lattice_echo
+          build_one lattice-cloud effects/lattice-cloud/nts1 revfx dummy-revfx lattice_cloud
+          build_one lattice-field effects/lattice-field/nts1 delfx dummy-delfx lattice_field
 
           printf '\nSource commit: `%s`\n' "$GITHUB_SHA" >> prehandoff-build/ARM_BUILD_RESULTS.md
           cat prehandoff-build/ARM_BUILD_RESULTS.md >> "$GITHUB_STEP_SUMMARY"
