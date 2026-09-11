@@ -13,6 +13,7 @@ This is a documentation reconciliation only. No DSP source, manifest, binary, co
 - Draft PR #10 targets `lattice-suite` from `field-0.1-0-test`.
 - The development branch is materially ahead of `lattice-suite`; this is intentional while FIELD/CORE integration remains under hardware validation.
 - `LATTICE_CURRENT_STATUS.md` already contained the strongest current-state summary, but `LATTICE_SYSTEM.md` still contained stale FIELD 0.1-1 / next-milestone wording. That system document was synchronized in the same reconciliation cycle.
+- The root `README.md` also did not mention LATTICE at all, despite LATTICE being the active system-development effort. README was updated in the same reconciliation cycle with the current CORE/FIELD status and links to the authoritative LATTICE documents.
 
 ## Prior-chat changes verified as already represented somewhere in the repo
 
@@ -105,7 +106,21 @@ Correction: `LATTICE_SYSTEM.md` was updated to:
 - include CORE + FIELD FAIL / RETEST status;
 - identify the proposed CORE 0.3-1 profile as pending approval, not implemented.
 
-### 2. Durable historical documents still contain older status language
+### 2. Root `README.md` did not expose active LATTICE work
+
+The root README described the older 25-unit M1 suite and backburner state correctly, but it had no LATTICE section and therefore gave a stale picture of current development priorities.
+
+Correction: README now includes:
+
+- preferred CORE → FIELD → optional built-in Korg reverb architecture;
+- CORE 0.3-0 high-TIME hardware failure;
+- FIELD 0.1-2 standalone listening PASS and open validation status;
+- Corrosion + FIELD and Albedo + FIELD findings;
+- CORE + FIELD FAIL / RETEST status;
+- proposed CORE 0.3-1 as design-only / pending approval;
+- ordered links to current LATTICE status, system, history, FIELD spec, reporting protocol and reports.
+
+### 3. Durable historical documents still contain older status language
 
 `LATTICE_HISTORY.md` and portions of `LATTICE_FIELD_SPEC.md` were written before the latest FIELD implementation/hardware cycle and contain historical status lines such as FIELD being at specification stage or 0.1-1 candidate status.
 
@@ -113,8 +128,9 @@ These older statements are historical context, not current authority. Until thos
 
 1. `LATTICE_CURRENT_STATUS.md`
 2. `LATTICE_SYSTEM.md`
-3. latest dated reports under `reports/lattice/`
-4. historical sections of `LATTICE_HISTORY.md` / `LATTICE_FIELD_SPEC.md`
+3. root `README.md`
+4. latest dated reports under `reports/lattice/`
+5. historical sections of `LATTICE_HISTORY.md` / `LATTICE_FIELD_SPEC.md`
 
 The top-level 0.1-2 amendments in the FIELD spec remain authoritative over older body text where they conflict.
 
