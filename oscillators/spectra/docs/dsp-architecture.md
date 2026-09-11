@@ -6,6 +6,12 @@ The original NTS-1 user oscillator callback receives an `int32_t *yn` output buf
 
 Do not design per-voice pan inside this unit. That belongs in a downstream effect.
 
+## MkI density ceiling
+
+The current MkI production architecture is limited to **three internal voices**. The earlier fourth voice was removed after physical listening found that SPECTRA sounded great through three voices but degraded at four.
+
+The three-voice ceiling is therefore a musical/hardware design constraint, not just an optimization.
+
 ## Audio/control split
 
 Expensive or state-setting work should happen outside the inner sample loop whenever possible.
@@ -34,7 +40,7 @@ Recalculate once per `OSC_CYCLE()`:
 
 Per sample:
 
-- advance four audio phases
+- advance up to three audio phases
 - advance active drift phases
 - calculate bounded drift cents
 - render waveform for active voices
@@ -53,15 +59,13 @@ voice_increment =
   * drift_ratio(sample)
 ```
 
-Harmonic, spread, and chaos ratios should be precomputed when their source parameter/event changes.
+Harmonic, spread, and chaos ratios are precomputed when their source parameter/event changes.
 
-Drift depth is small enough that a first-order cents-to-ratio approximation is acceptable for M1/M2 testing:
+Drift depth is small enough that a first-order cents-to-ratio approximation is used:
 
 ```text
 ratio ≈ 1 + cents * ln(2) / 1200
 ```
-
-If hardware listening reveals beating asymmetry or tuning error, replace this with a higher-accuracy bounded approximation.
 
 ## Wave morph
 
@@ -71,27 +75,31 @@ If hardware listening reveals beating asymmetry or tuning error, replace this wi
 sine -> triangle -> band-limited saw -> band-limited square
 ```
 
-The SDK's own oscillator lookup functions should be preferred for sine and band-limited discontinuous waveforms.
+The SDK oscillator lookup functions are used for sine and band-limited discontinuous waveforms.
 
 ## Band-limit selection
 
-The SDK provides seven band-limited saw/square tables associated with note regions around:
-
-```text
-36, 48, 60, 72, 84, 108, 127
-```
-
 SPECTRA chooses a conservative table using the base note plus the voice's upward interval contribution.
 
-High-register CLUSTER/OCTAVE modes need special attention because the upper voices approach the edge of the useful range sooner than an ordinary unison oscillator.
+High-register CLUSTER/OCTAVE modes need special attention because upper interval voices approach the edge of the useful range sooner than ordinary unison.
 
 ## Normalization
 
 Each active voice has a base weight. Chaos may perturb it within a small range.
 
-The sum is normalized by total active weight rather than simply dividing by four. This keeps one-voice and four-voice output levels closer together.
+The sum is normalized by total active weight rather than a fixed divisor. This keeps one-, two-, and three-voice output levels closer together.
 
-Any final soft clipping is a safety stage, not the primary gain strategy.
+Final soft clipping is a safety stage, not the primary gain strategy.
+
+## Three-voice spread geometry
+
+```text
+1 voice :  0
+2 voices: -1, +1
+3 voices: -1,  0, +1
+```
+
+This keeps three-voice unison spread centered around the played pitch.
 
 ## Deterministic zero state
 
@@ -105,6 +113,10 @@ ALT = 0
 HarmMode = UNISON
 ```
 
-all active voices should collapse to deterministic unison behavior. Their phase anchors may still differ by design, but repeated note-ons must reproduce the same result.
+all active voices collapse to deterministic unison behavior. Repeated note-ons must reproduce the same result.
 
 This is the reference state for debugging.
+
+## Safety rule
+
+Even if a host/test sends an out-of-range `Voices` parameter, production DSP hard-clamps to three active voices. A fourth voice cannot be re-enabled accidentally through parameter injection.
