@@ -14,7 +14,16 @@ Pass when:
 
 Do not debug SPECTRA before the stock oscillator template passes.
 
-## M1 — Stable four-voice source
+## Current hardware rule — three voices maximum
+
+The previous 0.2-0 build exposed four internal voices. Physical MkI listening found SPECTRA excellent through three voices but degraded at four. Version 0.2-1 therefore hard-caps the MkI build at **1–3 voices**.
+
+Testing must now confirm both:
+
+- the `Voices` control exposes only 1–3;
+- out-of-range parameter values cannot reactivate a fourth voice.
+
+## Stable three-voice source
 
 ### Test setup
 
@@ -44,9 +53,9 @@ Confirm:
 
 ### Voices
 
-Test `Voices` values 1–4.
+Test `Voices` values 1–3.
 
-Pass when density increases without a large output-level jump.
+Pass when density increases without a large output-level jump and three voices retain the physically approved musical quality.
 
 ### SHAPE
 
@@ -58,12 +67,7 @@ Expected path:
 sine -> triangle -> saw -> square
 ```
 
-Listen for:
-
-- clicks
-- discontinuous gain jumps
-- strong aliasing
-- DC-like offsets
+Listen for clicks, discontinuous gain jumps, strong aliasing, and DC-like offsets.
 
 ### Spread
 
@@ -72,6 +76,7 @@ With `HarmMode = UNISON`, `ALT = 0`, `Drift = 0`, `Chaos = 0`:
 - Spread 0% should collapse tuning
 - increasing Spread should create stable beating
 - maximum Spread should remain centered overall
+- three-voice geometry should remain approximately `-width / center / +width`
 
 ### Harmonic modes
 
@@ -88,7 +93,7 @@ QUARTAL
 CLUSTER
 ```
 
-Verify the root remains present and the expected interval character is audible.
+Verify the root remains present and the expected three-voice interval character is audible.
 
 ### ALT
 
@@ -96,11 +101,11 @@ For each harmonic mode:
 
 - ALT 0 = unison
 - ALT 50% = intermediate interval distances
-- ALT 100% = full constellation
+- ALT 100% = full three-voice constellation
 
 The transition should be continuous rather than switching suddenly.
 
-## M2 — Drift
+## Drift
 
 With Spread = 0 and Chaos = 0:
 
@@ -112,7 +117,7 @@ With Spread = 0 and Chaos = 0:
 
 Run sustained notes for 1–2 minutes to hear long drift cycles.
 
-## M3 — Chaos
+## Chaos
 
 At Chaos = 0, repeatedly trigger the same note and record it. Repeats should be effectively deterministic.
 
@@ -125,13 +130,7 @@ Increase Chaos in stages:
 100%
 ```
 
-Check that successive note-ons vary in:
-
-- phase character
-- fine tuning
-- internal balance
-
-But remain bounded and musically related to the patch.
+Check that successive note-ons vary in phase character, fine tuning, and internal balance while remaining bounded and musically related to the patch.
 
 ## Host LFO interaction
 
@@ -153,10 +152,10 @@ If aliasing becomes objectionable, reduce upper-voice contribution or choose a m
 
 ## Level/stability test
 
-Test worst-case density:
+Test worst-case approved density:
 
 ```text
-Voices = 4
+Voices = 3
 Spread = 100%
 Drift = 100%
 HarmMode = CLUSTER or OCTAVE
@@ -171,21 +170,30 @@ Pass when:
 - no NaN/Inf-like blasts
 - no oscillator lockup
 - no persistent DC offset
-- stable for at least 30 minutes
+- three-voice sound remains musically intact
 
-## Integration test — PARALLAX
+## A-class deterministic host gate
 
-After SPECTRA passes independently:
+`tests/pre-handoff/unit_specific/test_spectra.cpp` must prove:
 
-```text
-SPECTRA -> NTS-1 host voice -> PARALLAX
-```
+- single-voice pitch tracking
+- SHAPE harmonic change
+- three-voice Spread delivery
+- root/fifth/octave delivery in the reference harmonic mode
+- Drift and Motion behavior
+- Chaos deterministic/randomized contracts
+- finite/bounded output
+- hard three-voice ceiling even when an out-of-range voice parameter is injected
 
-Check:
+## Physical 0.2-1 regression gate
 
-- whether four internal pitches remain intelligible after spatial processing
-- mono collapse
-- excessive comb cancellation
-- whether SPECTRA Spread and PARALLAX Divergence duplicate each other too strongly
+The new binary must be loaded on the original NTS-1 MkI and checked at Voices 1, 2 and 3.
 
-Document one conservative and one extreme recommended pairing.
+Pass when:
+
+- unit loads/selects normally;
+- Voices cannot reach 4;
+- 1–3 retain the tone/musicality approved in the prior hardware pass;
+- no new level, aliasing, or note-transition defect is introduced by the cap.
+
+See `reports/testing/2026-09-12_spectra-three-voice-cap.md`.
