@@ -23,6 +23,10 @@ on:
       - '.github/workflows/build-delfx-suite.yml'
   workflow_dispatch:
 
+concurrency:
+  group: delfx-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-22.04
