@@ -15,6 +15,10 @@ on:
       - '.github/workflows/build-revfx-suite.yml'
   workflow_dispatch:
 
+concurrency:
+  group: revfx-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-22.04
