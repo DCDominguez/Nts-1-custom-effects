@@ -22,8 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Run suite-wide production DSP common gate
-        run: |
-          python3 tests/pre-handoff/run_suite.py
+        run: python3 tests/pre-handoff/run_suite.py
       - name: Publish result summary
         if: always()
         run: |
@@ -34,3 +33,73 @@ jobs:
         with:
           name: pre-handoff-suite-results
           path: tests/pre-handoff/results.md
+
+  arm-build-package:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi
+      - name: Clone current official Korg logue SDK
+        run: git clone --recursive --depth 1 https://github.com/korginc/logue-sdk.git
+      - name: Build and package all tracked units
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p prehandoff-build/binaries
+          printf '# Fresh ARM build/package gate\n\n' > prehandoff-build/ARM_BUILD_RESULTS.md
+          printf '| Unit | Module | text | data | bss | total |\n|---|---|---:|---:|---:|---:|\n' >> prehandoff-build/ARM_BUILD_RESULTS.md
+
+          build_one() {
+            local name="$1" source="$2" module="$3" template="$4"
+            local target="logue-sdk/platform/nutekt-digital/${name}"
+            cp -a "logue-sdk/platform/nutekt-digital/${template}" "$target"
+            cp "${source}/manifest.json" "$target/manifest.json"
+            cp "${source}/project.mk" "$target/project.mk"
+            mkdir -p "$target/src"
+            cp -a "${source}/src/." "$target/src/"
+            (cd "$target" && make GCC_BIN_PATH=/usr/bin && make GCC_BIN_PATH=/usr/bin install)
+            read -r text data bss dec hex file <<< "$(arm-none-eabi-size "$target/build/${name}.elf" | tail -n 1)"
+            printf '| %s | `%s` | %s | %s | %s | %s |\n' "$name" "$module" "$text" "$data" "$bss" "$dec" >> prehandoff-build/ARM_BUILD_RESULTS.md
+            cp "$target/${name}.ntkdigunit" prehandoff-build/binaries/
+          }
+
+          build_one spectra oscillators/spectra/nts1 osc dummy-osc
+          build_one parallax effects/parallax/nts1 delfx dummy-delfx
+          build_one chordghost effects/chordghost/nts1 delfx dummy-delfx
+          build_one dust effects/dust/nts1 modfx dummy-modfx
+          build_one carrier effects/carrier/nts1 modfx dummy-modfx
+          build_one vectorfilter effects/vectorfilter/nts1 modfx dummy-modfx
+          build_one ironrot effects/ironrot/nts1 modfx dummy-modfx
+          build_one attractor effects/attractor/nts1 modfx dummy-modfx
+          build_one zerocross effects/zerocross/nts1 modfx dummy-modfx
+          build_one phasewell effects/phasewell/nts1 modfx dummy-modfx
+          build_one ascender effects/ascender/nts1 modfx dummy-modfx
+          build_one helix effects/helix/nts1 modfx dummy-modfx
+          build_one capstan effects/capstan/nts1 modfx dummy-modfx
+          build_one sideband effects/sideband/nts1 modfx dummy-modfx
+          build_one faultline effects/faultline/nts1 modfx dummy-modfx
+          build_one ballistic effects/ballistic/nts1 delfx dummy-delfx
+          build_one rainfall effects/rainfall/nts1 delfx dummy-delfx
+          build_one swarmdelay effects/swarmdelay/nts1 delfx dummy-delfx
+          build_one glitchrepeat effects/glitchrepeat/nts1 delfx dummy-delfx
+          build_one bucketline effects/bucketline/nts1 delfx dummy-delfx
+          build_one longmemory effects/longmemory/nts1 delfx dummy-delfx
+          build_one shard effects/shard/nts1 delfx dummy-delfx
+          build_one abyss effects/abyss/nts1 revfx dummy-revfx
+          build_one aureole effects/aureole/nts1 revfx dummy-revfx
+          build_one nebula effects/nebula/nts1 revfx dummy-revfx
+          build_one lattice-core effects/lattice-core/nts1 modfx dummy-modfx
+          build_one lattice-echo effects/lattice-echo/nts1 delfx dummy-delfx
+          build_one lattice-cloud effects/lattice-cloud/nts1 revfx dummy-revfx
+          build_one lattice-field effects/lattice-field/nts1 delfx dummy-delfx
+
+          printf '\nSource commit: `%s`\n' "$GITHUB_SHA" >> prehandoff-build/ARM_BUILD_RESULTS.md
+          cat prehandoff-build/ARM_BUILD_RESULTS.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload fresh ARM build set
+        uses: actions/upload-artifact@v4
+        with:
+          name: pre-handoff-arm-builds
+          path: prehandoff-build/
