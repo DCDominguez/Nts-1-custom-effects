@@ -54,6 +54,12 @@ static inline void reset() {
 void MODFX_INIT(uint32_t platform, uint32_t api) {
   (void)platform;
   (void)api;
+  // Initialization must be independent of any prior in-process state. The host
+  // will resend the selected program's parameters after init, but leaving the
+  // smoothed controls from an earlier lifetime changes how many chaotic updates
+  // occur during the first slew and therefore changes the deterministic orbit.
+  s_rate_target = s_rate = 0.25f;
+  s_depth_target = s_depth = 0.0f;
   reset();
 }
 
