@@ -17,6 +17,12 @@ CASES = [
     ("VECTORFILTER", TESTS / "test_vectorfilter.cpp"),
     ("ATTRACTOR", TESTS / "test_attractor.cpp"),
     ("CHORDGHOST", TESTS / "test_chordghost.cpp"),
+    ("PHASEWELL", TESTS / "test_phasewell.cpp"),
+    ("ASCENDER", TESTS / "test_ascender.cpp"),
+    ("HELIX", TESTS / "test_helix.cpp"),
+    ("CAPSTAN", TESTS / "test_capstan.cpp"),
+    ("SIDEBAND", TESTS / "test_sideband.cpp"),
+    ("FAULTLINE", TESTS / "test_faultline.cpp"),
     ("LATTICE CORE", TESTS / "test_lattice_core.cpp"),
 ]
 
