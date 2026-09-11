@@ -29,9 +29,13 @@ int main(int argc,char**argv){const char*name=argc>1?argv[1]:"revfx";constexpr u
 
  REVFX_INIT(0,0);REVFX_RESUME();settle(.85f,.75f,1);Stats imp;std::fill(b,b+B*2,0.0f);b[0]=b[1]=.6f;process(b,B,imp);double e1=0,e2=0,e3=0;const uint32_t total=30*48000/B;
  for(uint32_t block=0;block<total;++block){std::fill(b,b+B*2,0.0f);process(b,B,imp);double e=0;for(float x:b)e+=std::fabs(x);if(block>=48000/B&&block<6*48000/B)e1+=e;if(block>=12*48000/B&&block<17*48000/B)e2+=e;if(block>=25*48000/B)e3+=e;}
- check(e1>1.0e-4,"impulse fails to excite reverb tail");check(e3<e1*.45+1.0e-4,"reverb tail does not decay");check(e3<e2*.9+1.0e-4,"late reverb energy is not trending toward rest");std::printf("PASS impulse/tail decay; E1 %.6f E2 %.6f E3 %.6f peak %.6f\n",e1,e2,e3,imp.peak);
+ std::printf("INFO impulse/tail metrics: E1 %.9f E2 %.9f E3 %.9f ratios %.9f %.9f peak %.6f\n",e1,e2,e3,e1>0?e2/e1:0.0,e2>0?e3/e2:0.0,imp.peak);
+ check(e1>1.0e-4,"impulse fails to excite reverb tail");
+ check(e3<e1*.45+1.0e-4,"reverb tail does not decay enough by 25-30 s");
+ check(e3<e2*.9+1.0e-4,"late reverb energy is not trending toward rest");
+ std::puts("PASS impulse/tail decay");
 
- REVFX_INIT(0,0);REVFX_RESUME();Stats normal;n=0;setp(.9f,.9f,.8f);for(uint32_t block=0;block<3000;++block){for(uint32_t i=0;i<B;++i,++n){float x=.55f*tone(n,110,.8f)+.2f*noise(.5f);x=std::max(-.8f,std::min(.8f,x));b[2*i]=x;b[2*i+1]=-.55f*x+.1f*noise(.4f);}process(b,B,normal);}check(normal.clip_hits==0,"normal material reaches hard full-scale clamp");std::printf("PASS normal headroom; peak %.6f clip hits %llu\n",normal.peak,(unsigned long long)normal.clip_hits);
+ REVFX_INIT(0,0);REVFX_RESUME();Stats normal;n=0;setp(.9f,.9f,.8f);for(uint32_t block=0;block<3000;++block){for(uint32_t i=0;i<B;++i,++n){float x=.55f*tone(n,110,.8f)+.2f*noise(.5f);x=std::max(-.8f,std::min(.8f,x));b[2*i]=x;b[2*i+1]=-.55f*x+.1f*noise(.4f);}process(b,B,normal);}std::printf("INFO normal headroom: peak %.6f clip hits %llu\n",normal.peak,(unsigned long long)normal.clip_hits);check(normal.clip_hits==0,"normal material reaches hard full-scale clamp");std::puts("PASS normal headroom");
 
  REVFX_INIT(0,0);REVFX_RESUME();Stats sweep;n=0;const auto t0=std::chrono::steady_clock::now();for(uint32_t block=0;block<18000;++block){float p=(block%300)/299.0f;if((block/300)&1u)p=1-p;setp(p,1-p*.72f,(block%997)/996.0f);for(uint32_t i=0;i<B;++i,++n){float x=(block%13==0)?noise(.5f):tone(n,60+600*p,.45f);b[2*i]=x;b[2*i+1]=(block&1)?-.7f*x:.7f*x;}process(b,B,sweep);}const auto us=std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now()-t0).count();std::printf("PASS sweep/wrap soak; peak %.6f host %.3f us/block\n",sweep.peak,double(us)/18000.0);
  REVFX_SUSPEND();REVFX_RESUME();setp(.8f,.8f,1);Stats rest;for(uint32_t block=0;block<750;++block){std::fill(b,b+B*2,0.0f);process(b,B,rest);}check(rest.peak<1.0e-4f,"reset silence creates output");std::puts("PASS reset/rest");std::printf("ALL COMMON REVFX HOST TESTS PASSED: %s (hardware timing/tone not certified)\n",name);
