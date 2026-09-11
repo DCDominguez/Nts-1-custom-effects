@@ -11,7 +11,8 @@ Before a normal hardware handoff, we should reproduce and eliminate functional p
 Read:
 
 - [`PRE_HANDOFF_PROTOCOL.md`](PRE_HANDOFF_PROTOCOL.md) — required internal layers and handoff contract;
-- [`PRE_HANDOFF_COVERAGE.md`](PRE_HANDOFF_COVERAGE.md) — per-unit backfill status.
+- [`PRE_HANDOFF_COVERAGE.md`](PRE_HANDOFF_COVERAGE.md) — per-unit depth/backfill status;
+- [`reports/testing/2026-09-11_suite-wide-new-standard-retest.md`](reports/testing/2026-09-11_suite-wide-new-standard-retest.md) — first full-suite retest under the new shared gate.
 
 The intended DC handoff is now mostly:
 
@@ -22,6 +23,18 @@ The intended DC handoff is now mostly:
 Compilation alone is no longer sufficient for a normal handoff. A changed unit whose internal coverage is incomplete may still be handed over as an explicitly labeled **DIAGNOSTIC** build, but the missing coverage must be stated.
 
 Actual MkI loading and real-time deadline margin remain hardware-only facts; desktop tests must not be presented as proof of device CPU stability.
+
+### First suite-wide new-standard retest
+
+On 2026-09-11 all **29 tracked units** were run through the shared deterministic production-DSP common gate and rebuilt/packaged against a fresh clone of the current official Korg logue SDK.
+
+Final workflow: **Pre-handoff suite**, run **34605006118**.
+
+- host production-DSP common gate: **29/29 PASS**;
+- fresh ARM compile/package: **29/29 PASS**;
+- no production DSP source changes were required to achieve the final common-gate pass.
+
+This common-gate result does **not** automatically promote every unit to A-level depth. Project-specific behavioral coverage is still tracked in `PRE_HANDOFF_COVERAGE.md`; FIELD remains the deepest reference harness.
 
 ---
 
@@ -100,10 +113,11 @@ When a regression or new milestone is tested, record exact build/commit where po
 
 ## Current status
 
+- **Suite common engineering gate:** 29/29 PASS on run 34605006118.
 - **M1:** all 25 historical M1 units function on the physical original NTS-1 MkI; NEBULA has a clipping-quality defect and is awaiting redesign/retest if reopened.
 - **M2 Wave 1:** historical validation remains recorded; future changes must adopt the new pre-handoff protocol.
-- **LATTICE FIELD:** first unit at deep suite-wide pre-handoff coverage and the reference workflow for future backfill.
-- **LATTICE CORE:** next highest-priority backfill because high-TIME physical distortion remains open.
+- **LATTICE FIELD:** first unit at deep A-level pre-handoff coverage and the reference workflow for future backfill.
+- **LATTICE CORE:** common gate PASS, but physical high-TIME distortion remains open and deeper project-specific backfill is still highest priority.
 
 See [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the original suite-level validation record.
 
