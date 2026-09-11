@@ -1,24 +1,28 @@
 # Community Testing Guide
 
-This repository welcomes reproducible engineering tests and physical original-NTS-1 MkI reports.
+This repository welcomes reproducible engineering tests and physical Korg logue SDK hardware reports.
+
+The current production reference is the **original NTS-1 MkI**, while support for minilogue xd, prologue, NTS-1 MkII, NTS-3, microKORG2 and drumlogue is being added in stages. See `PLATFORM_SUPPORT.md`.
 
 The goal is to separate three questions cleanly:
 
 1. **Does the production DSP behave correctly under deterministic host tests?**
-2. **Does the candidate build/package correctly for the original NTS-1 MkI target?**
-3. **Does it load, run and sound good on real hardware?**
+2. **Does the candidate build/package correctly for its stated logue SDK target?**
+3. **Does it load, run and sound good on that real hardware product?**
 
 These are related, but they are not the same result.
 
 ---
 
-## Target platform
+## Current reference target
 
 - Korg Nu:Tekt NTS-1 digital kit, original / MkI
-- repository API target: logue SDK `1.1-0`
-- unit types used here: `osc`, `modfx`, `delfx`, `revfx`
+- repository reference API target: logue SDK `1.1-0`
+- reference unit types: `osc`, `modfx`, `delfx`, `revfx`
 
-The repository's CI clones the current official Korg logue SDK at runtime for the ARM build/package gate.
+The repository's CI clones the current official Korg logue SDK at runtime for build/package gates.
+
+Cross-platform ports must identify their product/API separately and do not inherit hardware validation from MkI.
 
 ---
 
@@ -47,7 +51,13 @@ Expected current result:
 29/29 common-gate PASS
 ```
 
-The script compiles and executes the actual production DSP source using host stubs. It checks common numerical/state/delivery behavior. It is not a cycle-accurate NTS-1 emulator.
+Project-specific A-class harnesses can be run with:
+
+```bash
+python3 tests/pre-handoff/run_unit_specific.py
+```
+
+The shared runner compiles and executes the actual production DSP source using host stubs. It checks common numerical/state/delivery behavior. It is not a cycle-accurate emulator for any Korg product.
 
 If you get a failure, report:
 
@@ -64,27 +74,27 @@ Do not modify production DSP merely to make a generic test pass until the test e
 
 On a fork, enable Actions and run the **Pre-handoff suite** workflow manually, or open a pull request that touches the watched test/effect/oscillator paths.
 
-The workflow has two independent jobs:
+The current workflow has two independent jobs:
 
 - `host-production-dsp`
 - `arm-build-package`
 
-A successful workflow establishes the shared host gate and fresh ARM compile/package gate for the tested commit.
+The host job now also runs any checked-in project-specific A-class harnesses.
 
-It does **not** prove physical MkI loading, CPU deadline margin or musical quality.
+A successful workflow establishes the tested host/build layers for that commit. It does **not** prove physical hardware loading, CPU deadline margin or musical quality.
 
-### 3. Test on a physical original NTS-1 MkI
+### 3. Test on physical logue SDK hardware
 
 Hardware reports are especially valuable because several facts cannot be certified by the desktop harness:
 
 - actual user-unit loading and selection;
-- real-time callback/deadline behavior on the MkI;
-- interaction with other active processors;
-- panel/clock behavior;
+- real-time callback/deadline behavior;
+- interaction with other active processors/runtimes;
+- panel, touch and clock behavior;
 - analog I/O behavior;
 - tone and musicality.
 
-Use `community/HARDWARE_TEST_REPORT.md` when reporting a device result.
+Use `community/HARDWARE_TEST_REPORT.md` when reporting a device result and identify the exact product/firmware/build.
 
 ---
 
@@ -152,16 +162,17 @@ All are useful, but they should not be conflated.
 
 When testing real hardware:
 
-- identify the exact unit/version/commit or supplied artifact;
-- identify the original NTS-1 MkI firmware if known;
+- identify the exact product, unit/version/commit or supplied artifact;
+- identify firmware if known;
 - state the input source;
-- state which MOD/DELAY/REVERB slots are active;
-- state exact control positions or approximate clock-face positions;
+- state all simultaneously active processors/runtimes;
+- identify built-in vs custom processors;
+- state exact control values or approximate positions;
 - change one variable at a time during fault isolation;
 - distinguish what you heard from what you infer caused it;
 - do not report a compile/desktop PASS as a hardware PASS.
 
-For combination tests, name every simultaneously active custom or built-in processor.
+For prologue, include single/dual-timbre context. For NTS-3, include runtime/slot and XY/touch mapping. For combination tests, name every simultaneously active custom or built-in processor.
 
 ---
 
@@ -170,8 +181,8 @@ For combination tests, name every simultaneously active custom or built-in proce
 Use one of these labels in prose or issues:
 
 - **HOST PASS / FAIL** — deterministic production-DSP test result
-- **ARM BUILD PASS / FAIL** — compile/package result
-- **LOAD PASS / FAIL** — physical MkI accepts/selects unit
+- **BUILD PASS / FAIL** — compile/package result for the named target
+- **LOAD PASS / FAIL** — physical product accepts/selects unit
 - **RUNTIME PASS / FAIL** — short real-hardware stability test
 - **MUSICAL PASS / PASS WITH NOTES / FAIL** — subjective usefulness/quality
 - **RETEST** — candidate changed or failure unresolved
@@ -180,11 +191,13 @@ This prevents a successful test at one layer from being mistaken for success at 
 
 ---
 
-## Current known platform limitation
+## Platform notes
 
 For the original NTS-1 MkI, do not treat a user DELAY and user REVERB as a generally supported independent simultaneous pair. The LATTICE documentation records the practical implications for FIELD/Albedo testing.
 
-When reporting combination behavior, say whether each processor is built-in or custom.
+Korg documents first-generation binary compatibility between prologue, minilogue xd and NTS-1 MkI when SDK versions match, but product-specific hardware testing is still required. In particular, prologue ModFX dual-timbre behavior needs explicit coverage.
+
+Korg's current SDK also includes a browser/WebAudio `websim` path for **NTS-1 MkII and NTS-3**. This is useful as an additional development/test layer, but it still does not replace physical hardware validation.
 
 ---
 
@@ -194,5 +207,6 @@ When reporting combination behavior, say whether each processor is built-in or c
 - LATTICE-specific engineering/hardware findings: `reports/lattice/`
 - Unit-specific QA: the unit's `docs/` directory or a focused pull request
 - Hardware reports from community members: issue/PR using the hardware report template
+- Cross-platform implementation notes: `PLATFORM_SUPPORT.md` and focused platform reports
 
 A reproducible failure is more valuable than a vague "it broke." Include the smallest input/control sequence that reproduces it.
