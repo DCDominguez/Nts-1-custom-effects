@@ -1,3 +1,5 @@
+> **MkI slot correction — 2026-09-11:** User DELAY and user REVERB share the SDK SRAM and SDRAM regions and are not a supported simultaneous pair. Earlier CORE + user ECHO + user SPACE proposals are superseded on that basis, not merely by an assumed CPU limit. CORE + FIELD remains a supported slot arrangement requiring physical runtime/headroom validation. Any reverb added alongside FIELD on the same MkI must be built-in; Albedo (user REVERB) replaces the user DELAY role rather than proving coexistence with FIELD. See [Sinevibes comparison and evidence](reports/lattice/2026-09-11_sinevibes-comparison-slot-correction.md).
+
 # Human Soon LATTICE — Project History and Engineering Context
 
 **Repository:** `DCDominguez/Nts-1-custom-effects`  
