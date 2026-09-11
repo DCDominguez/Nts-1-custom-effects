@@ -28,7 +28,7 @@ Tester rule: units not explicitly called out in the physical notes **loaded prop
 
 Physical findings do not change the A engineering grade, but they do change the separate hardware/music status:
 
-- SPECTRA: sounds great through 3 voices; the 4-voice setting degrades the sound. MkI release line is now capped at 3 voices in 0.2-1; exact new binary requires load retest.
+- SPECTRA 0.2-1: exact three-voice-capped binary now LOAD / RUNTIME / MUSICAL PASS for the reported playing test. The earlier 4-voice mode remains intentionally removed.
 - Delay family: functional/musical PASS with family-wide low perceived output level.
 - Reverb family except LATTICE SPACE: functional/musical PASS with family-wide low perceived output level.
 - ASCENDER / ATTRACTOR / CAPSTAN: functional PASS; effect is too subtle and needs musical audibility tuning.
@@ -37,7 +37,7 @@ Physical findings do not change the A engineering grade, but they do change the 
 - LATTICE SPACE: loads/functions, but is very subtle at full MIX and distorts when run with modulation; redesign/revoice candidate.
 - All other units: LOAD / RUNTIME / MUSICAL PASS for the reported playing test.
 
-See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`.
+See `reports/testing/2026-09-12_a-class-rc-physical-mki.md` and `reports/testing/2026-09-12_spectra-three-voice-cap.md`.
 
 ## What A means here
 
@@ -56,7 +56,7 @@ Those remain separate hardware/music statuses.
 
 | Unit | Type | Engineering coverage | Latest physical/music note |
 |---|---|---:|---|
-| SPECTRA | osc | **A** | prior RC: 1–3 voices sound great; 4 voices musical FAIL. 0.2-1 caps at 3 and needs exact-build load retest |
+| SPECTRA | osc | **A** | **0.2-1 exact build PASS**; 1–3 voices sound great; 4-voice mode intentionally removed |
 | PARALLAX | delfx | **A** | latest RC: load/runtime/music PASS; musically backburnered by design history |
 | CHORDGHOST | delfx | **A** | latest RC: load/runtime/music PASS; delay family level retune pending |
 | DUST | modfx | **A** | latest RC: load/runtime/music PASS |
