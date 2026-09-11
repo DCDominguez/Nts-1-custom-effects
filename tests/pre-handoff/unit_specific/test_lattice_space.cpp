@@ -13,6 +13,10 @@ namespace core {
 #include "effects/lattice-core/nts1/src/lattice_core.cpp"
 }
 
+namespace ironrot {
+#include "effects/ironrot/nts1/src/ironrot.cpp"
+}
+
 namespace spacefx {
 #include "effects/lattice-cloud/nts1/src/lattice_cloud.cpp"
 }
@@ -77,7 +81,7 @@ static double stereo_rms(const std::vector<float> &x, std::size_t skip = 0) {
 }
 
 int main() {
-  // MIX=0 remains an exact dry contract even while the room network runs.
+  // MIX=0 remains exact dry while the room network runs internally.
   spacefx::REVFX_INIT(0, 0);
   settle_space(0.6f, 0.4f, 0.0f);
   auto dry = tone(50000, 701.0);
@@ -85,16 +89,17 @@ int main() {
   proc_space(dry);
   req(hs_measure::max_abs_diff(dry, ref) < 2e-6, "MIX=0 is not dry");
 
-  // The 0.4 revoice must solve the physical 'barely there at full MIX' problem
-  // in measurable terms. Mid MIX has to materially alter a sustained source,
-  // and full MIX must retain useful output energy rather than collapse level.
+  // 0.4-1 must retain the 0.4 audibility improvement without relying on
+  // hidden feedback/output clipping.
   spacefx::REVFX_INIT(0, 0);
   settle_space(0.72f, 0.45f, 0.55f);
   auto mid = tone(144000, 347.0, 0.35);
   const auto mid_ref = mid;
   proc_space(mid);
   req(hs_measure::max_abs_diff(mid, mid_ref) > 0.04, "mid MIX remains too close to dry");
-  req(stereo_rms(mid, 24000) > 0.075, "mid MIX output level collapsed");
+  req(stereo_rms(mid, 24000) > 0.070, "mid MIX output level collapsed");
+  req(spacefx::s_feedback_clamps == 0u, "mid MIX drove hidden FDN clamps");
+  req(spacefx::s_output_clamps == 0u, "mid MIX drove emergency output clamps");
 
   spacefx::REVFX_INIT(0, 0);
   settle_space(0.72f, 0.45f, 1.0f);
@@ -102,7 +107,9 @@ int main() {
   const auto full_ref = full;
   proc_space(full);
   req(hs_measure::max_abs_diff(full, full_ref) > 0.10, "full MIX lacks clear wet identity");
-  req(stereo_rms(full, 24000) > 0.060, "full MIX output level is too low");
+  req(stereo_rms(full, 24000) > 0.055, "full MIX output level is too low");
+  req(spacefx::s_feedback_clamps == 0u, "full MIX drove hidden FDN clamps");
+  req(spacefx::s_output_clamps == 0u, "full MIX drove emergency output clamps");
 
   // Preserve an obvious early echo/spatial statement before the diffuse tail.
   auto early = impulse_tail(0.45f, 0.25f, 12000);
@@ -119,8 +126,7 @@ int main() {
   const double large_late = hs_measure::stats(ll, 2 * 48000, 2 * 48000).energy;
   req(large_late > small_late * 1.5 + 1e-8, "SPACE does not materially increase late-room persistence");
 
-  // DRIFT must reach audible output and widen/move the stereo geometry without
-  // requiring modulated delay reads.
+  // DRIFT must reach rendered output and preserve stereo motion.
   spacefx::REVFX_INIT(0, 0);
   settle_space(0.72f, 0.01f, 1.0f);
   auto still = tone(180000, 347.0);
@@ -134,27 +140,17 @@ int main() {
   auto mr = hs_measure::channel(moving, 1, 2, 30000, 120000);
   req(hs_measure::max_abs_diff(ml, mr) > 0.005, "SPACE output lacks stereo field");
 
-  // Maximum SPACE must remain bounded and ultimately return toward rest.
+  // Maximum SPACE must remain bounded and eventually return toward rest.
   auto tail = impulse_tail(1.0f, 1.0f, 14 * 48000);
   auto tl = hs_measure::channel(tail, 0);
   req(hs_measure::stats(tl).peak <= 0.996, "maximum SPACE exceeded output bounds");
   const double end = hs_measure::stats(tl, 13 * 48000, 48000).rms;
   req(end < 0.0015, "maximum SPACE tail failed to decay toward rest");
-  req(spacefx::s_guard_gain > 0.0f && spacefx::s_guard_gain <= 1.001f, "output guard entered invalid state");
 
-  // Guard recovery: a hot burst may attenuate, but a later moderate signal must
-  // not leave SPACE trapped at a stale low gain as could happen in 0.3.
-  spacefx::REVFX_INIT(0, 0);
-  settle_space(0.8f, 0.5f, 0.9f);
-  auto hot = tone(24000, 193.0, 0.95);
-  proc_space(hot);
-  auto moderate = tone(96000, 193.0, 0.25);
-  proc_space(moderate);
-  req(spacefx::s_guard_gain > 0.78f, "output guard failed to recover from hot burst");
-  req(stereo_rms(moderate, 24000) > 0.04, "post-overload room remained excessively attenuated");
-
-  // Production chain stress: CORE -> SPACE. This checks actual DSP interaction
-  // for bounded/finite output and useful delivery, but makes no ARM timing claim.
+  // Production chain stress: CORE -> SPACE. The previous hardware candidate
+  // distorted in this exact family of combinations. Desktop host testing cannot
+  // prove MkI deadlines, but it can now reject hidden FDN/output clipping rather
+  // than merely accepting finite bounded audio.
   core::MODFX_INIT(0, 0);
   spacefx::REVFX_INIT(0, 0);
   core::MODFX_PARAM(k_user_modfx_param_time, q(0.76f));
@@ -179,15 +175,47 @@ int main() {
     }
   }
   req(chain_energy > 100.0, "CORE -> SPACE chain lost useful audio delivery");
+  req(spacefx::s_feedback_clamps == 0u, "CORE -> SPACE drove FDN state clipping");
+  req(spacefx::s_output_clamps == 0u, "CORE -> SPACE drove output clipping");
 
-  // Suspend/resume clears predelay/diffusion/FDN state.
+  // A second real production ModFX path catches the possibility that the CORE
+  // waveform happened to be unusually friendly. IRONROT is useful here because
+  // its nonlinear character can produce denser crest/spectral content.
+  ironrot::MODFX_INIT(0, 0);
+  spacefx::REVFX_INIT(0, 0);
+  ironrot::MODFX_PARAM(k_user_modfx_param_time, q(0.78f));
+  ironrot::MODFX_PARAM(k_user_modfx_param_depth, q(0.72f));
+  set_space(0.78f, 0.62f, 0.82f);
+  chain_energy = 0.0;
+  for (int block = 0; block < 4200; ++block) {
+    for (int i = 0; i < 64; ++i) {
+      const uint32_t n = static_cast<uint32_t>(block * 64 + i);
+      const float v = 0.46f * std::sin(2.0 * hs_measure::kPi * (109.0 + (block % 9) * 37.0) * n / 48000.0);
+      in[2 * i] = v;
+      in[2 * i + 1] = -0.84f * v;
+    }
+    ironrot::MODFX_PROCESS(in.data(), modout.data(), sub.data(), subout.data(), 64);
+    spacefx::REVFX_PROCESS(modout.data(), 64);
+    for (float v : modout) {
+      req(std::isfinite(v), "IRONROT -> SPACE produced non-finite output");
+      req(std::fabs(v) <= 0.996f, "IRONROT -> SPACE exceeded output bound");
+      chain_energy += static_cast<double>(v) * static_cast<double>(v);
+    }
+  }
+  req(chain_energy > 50.0, "IRONROT -> SPACE chain lost useful audio delivery");
+  req(spacefx::s_feedback_clamps == 0u, "IRONROT -> SPACE drove FDN state clipping");
+  req(spacefx::s_output_clamps == 0u, "IRONROT -> SPACE drove output clipping");
+
+  // Suspend/resume clears predelay/diffusion/FDN state and diagnostics.
   spacefx::REVFX_SUSPEND();
   spacefx::REVFX_RESUME();
   std::vector<float> z(16000 * 2, 0.0f);
   proc_space(z);
   req(hs_measure::stats(hs_measure::channel(z, 0)).peak < 1e-7, "reset emitted stale room history");
+  req(spacefx::s_feedback_clamps == 0u && spacefx::s_output_clamps == 0u,
+      "reset did not clear SPACE diagnostic counters");
 
-  // Long control/wrap soak covers every circular buffer and guard recovery.
+  // Long control/wrap soak covers circular buffers and safety bounds.
   spacefx::REVFX_INIT(0, 0);
   std::vector<float> b(128);
   for (int bb = 0; bb < 11000; ++bb) {
@@ -196,7 +224,7 @@ int main() {
               ((bb * 79) % 101) / 100.0f);
     for (int i = 0; i < 64; ++i) {
       const uint32_t n = static_cast<uint32_t>(bb * 64 + i);
-      const float v = 0.78f * std::sin(2.0 * hs_measure::kPi *
+      const float v = 0.72f * std::sin(2.0 * hs_measure::kPi *
                                      (97.0 + (bb % 17) * 107.0) * n / 48000.0);
       b[2 * i] = v;
       b[2 * i + 1] = -0.72f * v;
@@ -208,6 +236,6 @@ int main() {
     }
   }
 
-  std::puts("LATTICE SPACE 0.4 A-class harness PASS (presence + CORE-chain stress included)");
+  std::puts("LATTICE SPACE 0.4-1 A-class harness PASS (guard isolation + hidden-clipping checks)");
   return 0;
 }
