@@ -61,10 +61,10 @@ Preserve FIELD's current sound unless later physical evidence requires a change.
 ## SPACE
 
 **Last physically tested candidate:** `0.4-0` (`LatSpace`, custom `revfx`)  
-**0.4-0 engineering status:** **A-CLASS / ARM PASS**  
 **0.4-0 physical combination status:** **FAIL / RETEST**  
-**Current development candidate:** `0.4-1` guard/headroom diagnostic  
-**0.4-1 physical status:** **NOT YET TESTED**.
+**Current candidate:** `0.4-1` guard/headroom diagnostic  
+**0.4-1 engineering status:** **A-CLASS / ARM PASS**  
+**0.4-1 physical status:** **RETEST REQUIRED**.
 
 ### New 0.4-0 physical result
 
@@ -83,13 +83,11 @@ No exact CPU/deadline, clipping or analog cause is inferred from the sound alone
 
 Issue #9 comment `5639386820` records this result.
 
-### Why 0.4-1 exists
+### SPACE 0.4-1 diagnostic
 
-SPACE 0.4-0 still had a sample-by-sample dynamic output guard. Whenever the raw wet/dry sum exceeded the ceiling, gain was changed immediately according to the current peak. That can create an audible nonlinear amplitude process on complex ModFX output even if the final samples stay numerically bounded.
+SPACE 0.4-0 still had a sample-by-sample dynamic output guard. Whenever the raw wet/dry sum exceeded the ceiling, gain was changed immediately according to the current peak. A numerically bounded waveform can therefore still be audibly distorted.
 
-The 0.4-0 A-class chain test checked finite/bounded/useful output, but it did not reject frequent internal FDN safety-bound hits or repeated guard action. A numerically bounded signal can still sound distorted.
-
-0.4-1 therefore isolates this mechanism before a more destructive topology rewrite:
+0.4-1 isolates that mechanism before a more destructive topology rewrite:
 
 1. removes the dynamic output guard completely;
 2. keeps only an emergency final output bound;
@@ -102,18 +100,33 @@ Production source commit: `15382a34c25b94aefa36c84f2056ab7f32d42354`
 Manifest bump: `d6d9566cf9499498fbbd48a5306bd07e05a4b3c0`  
 Harness update: `03d2ec273bbe4aea56aacb447610ca46194350c7`.
 
+### 0.4-1 engineering result
+
+Pre-handoff workflow `34637349268`, branch head `f5483a871a58f74a31cf5598a13b553723496e62`:
+
+- shared production-DSP common gate: **PASS**;
+- full project-specific A-class harness run: **PASS**;
+- CORE 0.3-1 → SPACE hidden-clipping test: **PASS**;
+- IRONROT → SPACE hidden-clipping test: **PASS**;
+- fresh ARM build/package against a current official Korg logue SDK clone: **PASS**;
+- ARM artifact `10278202462`, SHA-256 `78f683d3fdd79d26bd0416606c6af303a4681cf58c5c41fa9f8f84ae0c5b04b3`;
+- host artifact `10279063165`, SHA-256 `a94ffcf488d76fca061a644fcb875b29dc647c81874668e7e0306641ef31ac52`;
+- exact SPACE 0.4-1 binary SHA-256 `56fd5b263920831af7298839d742482b837408795b2f29aa0232b5ef37a80b56`.
+
+These checks reject hidden FDN/output clipping in the modeled chains, but they still do **not** establish MkI real-time deadline margin.
+
 See `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md`.
 
 ### Fallback if 0.4-1 still distorts
 
-If the exact 0.4-1 build passes its host/ARM gates but still distorts after ModFX on physical MkI, stop tuning gain/limiting and move to a substantially cheaper SPACE topology:
+If the exact 0.4-1 build still distorts after ModFX on physical MkI, stop tuning gain/limiting and move to a substantially cheaper SPACE topology:
 
 - two-line cross-coupled room instead of four-line FDN;
 - fewer SDRAM reads/writes;
 - no separate diffusion bank if possible;
 - preserve early echo identity, dark stereo movement and long-room control with a lower runtime footprint.
 
-That next step would specifically test the remaining runtime/deadline hypothesis.
+That next step would directly test the remaining runtime/deadline hypothesis.
 
 ## ECHO
 
@@ -133,7 +146,8 @@ ECHO remains historical rather than the preferred LATTICE delay stage.
 
 ## Next gate
 
-1. Complete host/A-class and fresh ARM build/package for SPACE 0.4-1.
-2. If engineering gates pass, physically test the exact 0.4-1 binary after at least one built-in ModFX and CORE 0.3-1.
-3. If distortion is gone, record whether middle/full MIX and SPACE/DRIFT musical identity remain acceptable.
-4. If distortion remains, move directly to the lower-runtime two-line SPACE diagnostic instead of further gain tweaks.
+1. Physically test exact SPACE 0.4-1 standalone enough to confirm its current identity remains intact.
+2. Test one built-in ModFX → SPACE 0.4-1.
+3. Test CORE 0.3-1 → SPACE 0.4-1.
+4. If practical, test one other custom ModFX → SPACE 0.4-1.
+5. If distortion remains, note whether lowering source/input level materially changes it, then move directly to the lower-runtime two-line SPACE diagnostic.
