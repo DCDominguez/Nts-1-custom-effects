@@ -16,6 +16,13 @@ on:
       - '.github/workflows/pre-handoff-suite.yml'
   workflow_dispatch:
 
+# A-class backfill often lands as several small audit commits. Only the newest
+# commit on a branch/PR is useful; cancel superseded runs so community CI does
+# not build a long queue of already-obsolete candidates.
+concurrency:
+  group: pre-handoff-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   host-production-dsp:
     runs-on: ubuntu-22.04
