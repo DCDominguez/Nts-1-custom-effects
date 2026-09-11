@@ -12,11 +12,14 @@ OUT = ROOT / "tests" / "pre-handoff" / "unit-specific-results.md"
 
 CASES = [
     ("SPECTRA", TESTS / "test_spectra.cpp"),
+    ("PARALLAX", TESTS / "test_parallax.cpp"),
+    ("CHORDGHOST", TESTS / "test_chordghost.cpp"),
     ("DUST", TESTS / "test_dust.cpp"),
     ("CARRIER", TESTS / "test_carrier.cpp"),
     ("VECTORFILTER", TESTS / "test_vectorfilter.cpp"),
+    ("IRONROT", TESTS / "test_ironrot.cpp"),
     ("ATTRACTOR", TESTS / "test_attractor.cpp"),
-    ("CHORDGHOST", TESTS / "test_chordghost.cpp"),
+    ("ZEROCROSS", TESTS / "test_zerocross.cpp"),
     ("PHASEWELL", TESTS / "test_phasewell.cpp"),
     ("ASCENDER", TESTS / "test_ascender.cpp"),
     ("HELIX", TESTS / "test_helix.cpp"),
@@ -32,7 +35,11 @@ CASES = [
     ("SHARD", TESTS / "test_shard.cpp"),
     ("ABYSS", TESTS / "test_abyss.cpp"),
     ("AUREOLE", TESTS / "test_aureole.cpp"),
+    ("NEBULA", TESTS / "test_nebula.cpp"),
     ("LATTICE CORE", TESTS / "test_lattice_core.cpp"),
+    ("LATTICE ECHO", TESTS / "test_lattice_echo.cpp"),
+    ("LATTICE SPACE", TESTS / "test_lattice_space.cpp"),
+    ("LATTICE FIELD", ROOT / "tests" / "lattice-field" / "test.cpp"),
 ]
 
 
