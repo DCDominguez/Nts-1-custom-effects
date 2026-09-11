@@ -99,12 +99,8 @@ static inline void guard_pair(float &l, float &r) {
   const float target = peak > kGuardCeiling ? (kGuardCeiling / peak) : 1.0f;
 
   if (target < s_guard_gain) {
-    // Catch overload immediately.
     s_guard_gain = target;
   } else {
-    // Recover toward the currently safe gain even if the raw signal remains
-    // above the ceiling. SPACE 0.3 could remain over-attenuated for too long
-    // because it recovered only after raw peak fell below the ceiling.
     s_guard_gain += (target - s_guard_gain) * 0.0012f;
     if (s_guard_gain > 1.0f) s_guard_gain = 1.0f;
   }
@@ -163,8 +159,6 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     s_pre_l[s_pre_write] = in_l;
     s_pre_r[s_pre_write] = in_r;
 
-    // Fixed predelay and only two early taps per channel. SPACE controls the
-    // balance and persistence rather than continuously moving these read heads.
     const float pd_l = read_fixed(s_pre_l, s_pre_write, kPreMask, 613u);
     const float pd_r = read_fixed(s_pre_r, s_pre_write, kPreMask, 719u);
     const float e0_l = read_fixed(s_pre_l, s_pre_write, kPreMask, 311u);
@@ -174,8 +168,6 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float early_l = e0_l * 0.62f + e1_l * 0.38f;
     const float early_r = e0_r * 0.62f + e1_r * 0.38f;
 
-    // One diffusion stage keeps the room dense without the second stereo
-    // all-pass bank used by 0.3.
     const float diff_g = 0.48f + 0.07f * s_space;
     const float diff_in_l = pd_l * 0.68f + early_l * 0.52f;
     const float diff_in_r = pd_r * 0.68f + early_r * 0.52f;
@@ -184,15 +176,11 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float diff_r = allpass(diff_in_r, s_diff_r, kDiffMask,
                                  s_diff_write, 443u, diff_g);
 
-    // Fixed integer FDN reads are substantially cheaper than 0.3's four
-    // continuously interpolated modulated read heads.
     const float r0 = read_fixed(s_fdn0, s_fdn_write, kFdnMask, 1423u);
     const float r1 = read_fixed(s_fdn1, s_fdn_write, kFdnMask, 1987u);
     const float r2 = read_fixed(s_fdn2, s_fdn_write, kFdnMask, 2671u);
     const float r3 = read_fixed(s_fdn3, s_fdn_write, kFdnMask, 3433u);
 
-    // TIME/SPACE now controls persistence and body. DRIFT controls motion in
-    // damping/output geometry rather than delay-time interpolation.
     const float damping = 0.20f + 0.12f * (1.0f - s_drift);
     s_lp0 += (r0 - s_lp0) * damping;
     s_lp1 += (r1 - s_lp1) * damping;
@@ -206,7 +194,12 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
 
     const float diff_mid = 0.5f * (diff_l + diff_r);
     const float diff_side = 0.5f * (diff_l - diff_r);
-    const float feedback = 0.46f + 0.30f * s_space;
+
+    // A 0.50 -> 0.86 feedback range gives SPACE a genuinely long upper range
+    // while remaining bounded. The first 0.4 candidate topped out at 0.76 and
+    // the A-class late-room test correctly showed that its large-SPACE tail
+    // decayed too quickly to separate itself from the small-room state.
+    const float feedback = 0.50f + 0.36f * s_space;
     const float inject = mid * 0.10f + diff_mid * (0.30f + 0.08f * s_space);
     const float inject_side = side * (0.08f + 0.08f * s_drift) +
                               diff_side * (0.16f + 0.08f * s_drift);
@@ -223,8 +216,6 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float tail_l = 0.52f * (r0 + r2) + (0.12f + wander) * (r1 - r3);
     const float tail_r = 0.52f * (r1 + r3) + (0.12f - wander) * (r2 - r0);
 
-    // Slow body follower keeps the room weighty without relying on hot
-    // feedback saturation.
     s_body_l += (tail_l - s_body_l) * 0.050f;
     s_body_r += (tail_r - s_body_r) * 0.050f;
 
@@ -235,9 +226,6 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     const float wet_r = early_r * early_voice + diff_r * 0.20f +
                         tail_r * tail_voice + s_body_r * 0.18f;
 
-    // Full MIX is intentionally wet-dominant now. 0.3 retained 45% dry at
-    // maximum, which contributed to the physical report that SPACE was too
-    // subtle even when MIX was fully raised.
     const float dry_gain = 1.0f - 0.88f * s_mix;
     const float wet_gain = (0.78f + 0.30f * s_mix) * s_mix;
     float out_l = in_l * dry_gain + wet_l * wet_gain;
