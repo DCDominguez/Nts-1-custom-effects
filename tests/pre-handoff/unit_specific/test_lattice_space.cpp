@@ -17,9 +17,11 @@ namespace ironrot {
 #include "effects/ironrot/nts1/src/ironrot.cpp"
 }
 
+#define LATTICE_TEST
 namespace spacefx {
 #include "effects/lattice-cloud/nts1/src/lattice_cloud.cpp"
 }
+#undef LATTICE_TEST
 
 static void req(bool ok, const char *m) {
   if (!ok) {
@@ -89,7 +91,7 @@ int main() {
   proc_space(dry);
   req(hs_measure::max_abs_diff(dry, ref) < 2e-6, "MIX=0 is not dry");
 
-  // 0.4-1 must retain the 0.4 audibility improvement without relying on
+  // 0.4-2 must retain the accepted 0.4-1 audibility without relying on
   // hidden feedback/output clipping.
   spacefx::REVFX_INIT(0, 0);
   settle_space(0.72f, 0.45f, 0.55f);
@@ -236,6 +238,6 @@ int main() {
     }
   }
 
-  std::puts("LATTICE SPACE 0.4-1 A-class harness PASS (guard isolation + hidden-clipping checks)");
+  std::puts("LATTICE SPACE 0.4-2 A-class harness PASS (factored matrix + hidden-clipping checks)");
   return 0;
 }

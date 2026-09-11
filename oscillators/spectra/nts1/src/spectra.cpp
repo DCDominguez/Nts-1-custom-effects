@@ -127,19 +127,19 @@ static inline float render_wave(float phase, float shape, float note_for_tables)
   shape = clamp01(shape);
   note_for_tables = clampf(note_for_tables, 0.0f, 151.0f);
 
-  const float sine = osc_sinf(phase);
   const float tri = triangle(phase);
-  const float saw = osc_bl2_sawf(phase, osc_bl_saw_idx(note_for_tables));
-  const float square = osc_bl2_sqrf(phase, osc_bl_sqr_idx(note_for_tables));
-
   if (shape < (1.0f / 3.0f)) {
+    const float sine = osc_sinf(phase);
     const float t = shape * 3.0f;
     return sine + (tri - sine) * t;
   }
   if (shape < (2.0f / 3.0f)) {
+    const float saw = osc_bl2_sawf(phase, osc_bl_saw_idx(note_for_tables));
     const float t = (shape - (1.0f / 3.0f)) * 3.0f;
     return tri + (saw - tri) * t;
   }
+  const float saw = osc_bl2_sawf(phase, osc_bl_saw_idx(note_for_tables));
+  const float square = osc_bl2_sqrf(phase, osc_bl_sqr_idx(note_for_tables));
   const float t = (shape - (2.0f / 3.0f)) * 3.0f;
   return saw + (square - saw) * t;
 }
@@ -184,15 +184,17 @@ void OSC_CYCLE(const user_osc_param_t *const params, int32_t *yn, const uint32_t
   const float shape_lfo = q31_to_f32(params->shape_lfo);
   const float shape = clamp01(s.shape + shape_lfo);
 
+  const uint32_t active = (s.voices < 1u) ? 1u : (s.voices > kMaxVoices ? kMaxVoices : s.voices);
   float increments[kMaxVoices];
   float table_notes[kMaxVoices];
-  for (uint32_t i = 0u; i < kMaxVoices; ++i) {
+  float weight_sum = 0.0f;
+  for (uint32_t i = 0u; i < active; ++i) {
     float inc = base_increment * s.harmonic_ratio[i] * s.spread_ratio[i] * s.chaos_ratio[i];
     increments[i] = clampf(inc, 0.0f, kMaxPhaseIncrement);
     const float interval = kIntervalModes[s.harm_mode][i] * s.alt;
     table_notes[i] = clampf(static_cast<float>(note) + interval, 0.0f, 151.0f);
+    weight_sum += s.level[i];
   }
-
   q31_t *out = reinterpret_cast<q31_t *>(yn);
 
   for (uint32_t frame = 0u; frame < frames; ++frame) {
@@ -201,9 +203,6 @@ void OSC_CYCLE(const user_osc_param_t *const params, int32_t *yn, const uint32_t
     const float rate_scale = 0.20f + 1.80f * s.motion;
 
     float sum = 0.0f;
-    float weight_sum = 0.0f;
-    const uint32_t active = (s.voices < 1u) ? 1u : (s.voices > kMaxVoices ? kMaxVoices : s.voices);
-
     for (uint32_t i = 0u; i < active; ++i) {
       const float drift_wave = 0.72f * osc_sinf(s.drift_phase_a[i]) +
                                0.28f * osc_sinf(s.drift_phase_b[i]);
@@ -213,7 +212,6 @@ void OSC_CYCLE(const user_osc_param_t *const params, int32_t *yn, const uint32_t
 
       const float voice = render_wave(s.phase[i], shape, table_notes[i]);
       sum += voice * s.level[i];
-      weight_sum += s.level[i];
 
       s.phase[i] = wrap01(s.phase[i] + inc);
       s.drift_phase_a[i] = wrap01(s.drift_phase_a[i] + kDriftHzA[i] * rate_scale * k_samplerate_recipf);

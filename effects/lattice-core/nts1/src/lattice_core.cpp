@@ -45,6 +45,7 @@ static float s_guard_gain = 1.0f;
 static bool s_freeze_active = false;
 static uint32_t s_freeze_start = 0u;
 static uint32_t s_freeze_samples = 0u;
+static float s_freeze_inv_samples = 0.0f;
 static float s_freeze_phase = 0.0f;
 static float s_freeze_mix = 0.0f;
 
@@ -84,7 +85,7 @@ static inline float soft_limit(float x) {
   return x < 0.0f ? -y : y;
 }
 
-static inline float guard_pair(float &l, float &r) {
+static inline void guard_pair(float &l, float &r) {
   const float peak = maxf(absf(l), absf(r));
   if (peak > kGuardCeiling) {
     const float needed = kGuardCeiling / peak;
@@ -95,7 +96,6 @@ static inline float guard_pair(float &l, float &r) {
   }
   l *= s_guard_gain;
   r *= s_guard_gain;
-  return peak;
 }
 
 static inline float ms_to_samples(float ms) {
@@ -297,6 +297,7 @@ static void engage_freeze(void) {
   if (s_freeze_samples > max_capture) s_freeze_samples = max_capture;
   if (s_freeze_samples < 4096u) s_freeze_samples = 4096u;
   s_freeze_start = (s_write - s_freeze_samples) & kBufferMask;
+  s_freeze_inv_samples = 1.0f / static_cast<float>(s_freeze_samples);
   s_freeze_phase = 0.0f;
   s_freeze_active = true;
 }
@@ -330,6 +331,7 @@ static void reset_state(void) {
   s_freeze_active = false;
   s_freeze_start = 0u;
   s_freeze_samples = 0u;
+  s_freeze_inv_samples = 0.0f;
   s_freeze_phase = 0.0f;
   s_freeze_mix = 0.0f;
 
@@ -383,45 +385,47 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
       if (s_filled < kBufferSize) ++s_filled;
     }
 
-    const uint32_t voices = voice_count(s_time);
-    const uint32_t pattern = pattern_index(s_pattern);
-    const float mod = modulation_amount(s_time);
-
     float wet_l = 0.0f;
     float wet_r = 0.0f;
     uint32_t sounding = 0u;
+    uint32_t voices = 0u;
+    float mod = 0.0f;
 
     // Full freeze owns the processor while active. Ordinary microloop voices
     // retain their state but do not schedule, read, advance, or emit until the
     // freeze is released. This removes the avoidable high-TIME workload that
     // the 0.3-0 host probe confirmed was still running under settled freeze.
-    if (!s_freeze_active && voices > 0u &&
-        s_filled > static_cast<uint32_t>(ms_to_samples(320.0f))) {
-      for (uint32_t i = 0u; i < voices; ++i) {
-        LoopVoice &v = s_voice[i];
-        if (v.repeats_left == 0u) {
-          if (v.wait_samples > 0u) {
-            --v.wait_samples;
-          } else {
-            capture_voice(i, pattern, mod);
+    if (!s_freeze_active) {
+      voices = voice_count(s_time);
+      mod = modulation_amount(s_time);
+      if (voices > 0u && s_filled > 15360u) {
+        const uint32_t pattern = pattern_index(s_pattern);
+        for (uint32_t i = 0u; i < voices; ++i) {
+          LoopVoice &v = s_voice[i];
+          if (v.repeats_left == 0u) {
+            if (v.wait_samples > 0u) {
+              --v.wait_samples;
+            } else {
+              capture_voice(i, pattern, mod);
+            }
           }
-        }
 
-        if (v.repeats_left == 0u) continue;
-        ++sounding;
+          if (v.repeats_left == 0u) continue;
+          ++sounding;
 
-        const float sample_pos = static_cast<float>(v.capture_start) +
-                                 v.phase * static_cast<float>(v.loop_samples);
-        const float sample = read_frac_q15(sample_pos);
-        const float env = grain_window(v.phase) * v.voice_gain;
-        wet_l += sample * env * v.gain_l;
-        wet_r += sample * env * v.gain_r;
+          const float sample_pos = static_cast<float>(v.capture_start) +
+                                   v.phase * static_cast<float>(v.loop_samples);
+          const float sample = read_frac_q15(sample_pos);
+          const float env = grain_window(v.phase) * v.voice_gain;
+          wet_l += sample * env * v.gain_l;
+          wet_r += sample * env * v.gain_r;
 
-        v.phase += v.phase_inc;
-        while (v.phase >= 1.0f) {
-          v.phase -= 1.0f;
-          if (v.repeats_left > 0u) --v.repeats_left;
-          if (v.repeats_left == 0u) schedule_wait(v, mod);
+          v.phase += v.phase_inc;
+          while (v.phase >= 1.0f) {
+            v.phase -= 1.0f;
+            if (v.repeats_left > 0u) --v.repeats_left;
+            if (v.repeats_left == 0u) schedule_wait(v, mod);
+          }
         }
       }
     }
@@ -451,12 +455,12 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
       const float base = read_freeze(s_freeze_phase);
       // A small phase offset makes the mono history occupy stereo space without
       // doubling the capture memory footprint.
-      float rp = s_freeze_phase + (816.0f / static_cast<float>(s_freeze_samples));
+      float rp = s_freeze_phase + 816.0f * s_freeze_inv_samples;
       if (rp >= 1.0f) rp -= 1.0f;
       const float right = read_freeze(rp);
       freeze_l = base * 1.08f;
       freeze_r = right * 1.08f;
-      s_freeze_phase += 1.0f / static_cast<float>(s_freeze_samples);
+      s_freeze_phase += s_freeze_inv_samples;
       if (s_freeze_phase >= 1.0f) s_freeze_phase -= 1.0f;
     }
 

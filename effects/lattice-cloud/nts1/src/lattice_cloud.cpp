@@ -13,7 +13,9 @@ static const uint32_t kFdnSize = 4096u;
 static const uint32_t kFdnMask = kFdnSize - 1u;
 static const float kParamSlew = 0.0012f;
 
-// SPACE 0.4-1 is a focused MkI combination-distortion diagnostic.
+// SPACE 0.4-2 preserves the accepted 0.4-1 room and gain structure while
+// factoring its four-line matrix and removing host-only counters from ARM.
+// SPACE 0.4-1 was a focused MkI combination-distortion diagnostic.
 // 0.4-0 still distorted whenever the tester placed SPACE after modulation.
 // The topology is intentionally retained so this revision isolates two
 // nonlinear/high-energy behaviors instead of redesigning the room again:
@@ -46,8 +48,10 @@ static float s_phase = 0.0f;
 
 // Host-visible diagnostic counters. They cost only a conditional increment
 // when a safety bound is actually reached and make hidden clipping testable.
+#ifdef LATTICE_TEST
 static uint32_t s_feedback_clamps = 0u;
 static uint32_t s_output_clamps = 0u;
+#endif
 
 static float s_space_target = 0.56f;
 static float s_drift_target = 0.28f;
@@ -95,11 +99,15 @@ static inline float allpass(float x, float *buffer, uint32_t mask,
 
 static inline float feedback_bound(float x) {
   if (x > 0.985f) {
+#ifdef LATTICE_TEST
     ++s_feedback_clamps;
+#endif
     return 0.985f;
   }
   if (x < -0.985f) {
+#ifdef LATTICE_TEST
     ++s_feedback_clamps;
+#endif
     return -0.985f;
   }
   return x;
@@ -107,11 +115,15 @@ static inline float feedback_bound(float x) {
 
 static inline float output_bound(float x) {
   if (x > 0.995f) {
+#ifdef LATTICE_TEST
     ++s_output_clamps;
+#endif
     return 0.995f;
   }
   if (x < -0.995f) {
+#ifdef LATTICE_TEST
     ++s_output_clamps;
+#endif
     return -0.995f;
   }
   return x;
@@ -139,8 +151,10 @@ static void reset_state(void) {
   s_lp0 = s_lp1 = s_lp2 = s_lp3 = 0.0f;
   s_body_l = s_body_r = 0.0f;
   s_phase = 0.0f;
+#ifdef LATTICE_TEST
   s_feedback_clamps = 0u;
   s_output_clamps = 0u;
+#endif
   s_space_target = s_space = 0.56f;
   s_drift_target = s_drift = 0.28f;
   s_mix_target = s_mix = 0.34f;
@@ -197,10 +211,15 @@ void REVFX_PROCESS(float *xn, uint32_t frames) {
     s_lp2 += (r2 - s_lp2) * damping;
     s_lp3 += (r3 - s_lp3) * damping;
 
-    const float h0 = 0.5f * (s_lp0 + s_lp1 + s_lp2 + s_lp3);
-    const float h1 = 0.5f * (s_lp0 - s_lp1 + s_lp2 - s_lp3);
-    const float h2 = 0.5f * (s_lp0 + s_lp1 - s_lp2 - s_lp3);
-    const float h3 = 0.5f * (s_lp0 - s_lp1 - s_lp2 + s_lp3);
+    // Same Hadamard transform as 0.4-1, factored into shared pairs.
+    const float pair02 = s_lp0 + s_lp2;
+    const float pair13 = s_lp1 + s_lp3;
+    const float diff02 = s_lp0 - s_lp2;
+    const float diff13 = s_lp1 - s_lp3;
+    const float h0 = 0.5f * (pair02 + pair13);
+    const float h1 = 0.5f * (pair02 - pair13);
+    const float h2 = 0.5f * (diff02 + diff13);
+    const float h3 = 0.5f * (diff02 - diff13);
 
     const float diff_mid = 0.5f * (diff_l + diff_r);
     const float diff_side = 0.5f * (diff_l - diff_r);

@@ -1,7 +1,7 @@
 #include "userdelfx.h"
 #include <stdint.h>
 
-// FIELD 0.1-2: clocked recapture with protection through first-answer completion.
+// FIELD 0.1-3: 0.1-2 behavior with a factored four-line bloom matrix.
 // No allocation, moving delay heads, or wet-to-capture routing.
 namespace {
 const uint32_t SR = 48000u;
@@ -230,15 +230,21 @@ void bloom(float l, float r, float &outL, float &outR) {
       const float hp = 0.9975f * (damping[i] - dcIn[i]) + 0.995f * dcOut[i];
       dcIn[i] = damping[i]; dcOut[i] = hp; d[i] = hp;
     }
-    const float h[4] = {0.5f*(d[0]+d[1]+d[2]+d[3]), 0.5f*(d[0]-d[1]+d[2]-d[3]),
-                        0.5f*(d[0]+d[1]-d[2]-d[3]), 0.5f*(d[0]-d[1]-d[2]+d[3])};
+    // Algebraically equivalent Hadamard factorization: four shared pairs
+    // replace the repeated four-term sums in the matrix and tail readout.
+    const float pair02 = d[0] + d[2];
+    const float pair13 = d[1] + d[3];
+    const float diff02 = d[0] - d[2];
+    const float diff13 = d[1] - d[3];
+    const float h[4] = {0.5f*(pair02+pair13), 0.5f*(pair02-pair13),
+                        0.5f*(diff02+diff13), 0.5f*(diff02-diff13)};
     const float injection[4] = {a * 0.32f, b * 0.32f, a * 0.22f, -b * 0.22f};
     for (uint32_t i = 0; i < 4; ++i) {
       const float x = injection[i] + h[i] * 0.82f;
       field[i][fieldWrite] = finite(x) ? clamp(x, -2.0f, 2.0f) : 0.0f;
     }
-    const float tailL = 0.55f * (d[0]+d[2]) + 0.13f * (d[1]-d[3]);
-    const float tailR = 0.55f * (d[1]+d[3]) + 0.13f * (d[2]-d[0]);
+    const float tailL = 0.55f * pair02 + 0.13f * diff13;
+    const float tailR = 0.55f * pair13 - 0.13f * diff02;
     bodyLP[0] += (tailL - bodyLP[0]) * 0.10f;
     bodyLP[1] += (tailR - bodyLP[1]) * 0.10f;
     motion += 0.035f / SR; if (motion >= 1.0f) motion -= 1.0f;

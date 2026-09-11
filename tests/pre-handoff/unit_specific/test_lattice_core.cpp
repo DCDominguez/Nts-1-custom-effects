@@ -33,7 +33,8 @@ int main(){
   // Maximum TIME must engage recent-history freeze and stop history writes.
   MODFX_INIT(0,0); set_controls(0.0f,0.5f); run_frames(90000,0.45f,211.0); const uint32_t before=s_write; set_controls(1.0f,0.5f); run_frames(24000,0.45f,211.0); require(s_freeze_active,"maximum TIME did not engage freeze"); const uint32_t frozen_write=s_write; require(frozen_write>=before||before-frozen_write<kBufferSize,"invalid write index after freeze");
 
-  // 0.3-1 runtime contract: once freeze is active, ordinary microloop state must stop advancing/scheduling.
+  // 0.3-2 preserves the 0.3-1 runtime contract: once freeze is active,
+  // ordinary microloop state must stop advancing or scheduling.
   const uint32_t frozen_events=s_event_counter;
   uint32_t repeats[kMaxVoices]; uint32_t waits[kMaxVoices]; float phases[kMaxVoices];
   for(uint32_t i=0;i<kMaxVoices;++i){repeats[i]=s_voice[i].repeats_left;waits[i]=s_voice[i].wait_samples;phases[i]=s_voice[i].phase;}
@@ -51,5 +52,5 @@ int main(){
   // Long parameter abuse/soak including repeated freeze crossings.
   MODFX_INIT(0,0); std::vector<float> in(128),out(128),sub(128),sy(128); for(int block=0;block<9000;++block){float t=((block*17)%101)/100.0f; if((block%503)>470)t=1.0f; set_controls(t,((block*43)%101)/100.0f);for(int i=0;i<64;++i){float v=0.60f*std::sin(2.0*hs_measure::kPi*(83.0+(block%19)*59.0)*(block*64+i)/48000.0);in[2*i]=v;in[2*i+1]=0.9f*v;}MODFX_PROCESS(in.data(),out.data(),sub.data(),sy.data(),64);for(float v:out){require(std::isfinite(v),"non-finite output during soak");require(std::fabs(v)<=0.996f,"output bound exceeded during soak");}}
 
-  std::puts("LATTICE CORE 0.3-1 A-class project-specific harness PASS (physical MkI retest required)"); return 0;
+  std::puts("LATTICE CORE 0.3-2 A-class project-specific harness PASS (runtime-equivalent optimization candidate)"); return 0;
 }
