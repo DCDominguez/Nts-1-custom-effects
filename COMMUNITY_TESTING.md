@@ -2,7 +2,7 @@
 
 This repository welcomes reproducible engineering tests and physical Korg logue SDK hardware reports.
 
-The current production reference is the **original NTS-1 MkI**, while support for minilogue xd, prologue, NTS-1 MkII, NTS-3, microKORG2 and drumlogue is being added in stages. See `PLATFORM_SUPPORT.md`.
+The current production reference is the **original NTS-1 MkI**. Cross-platform work is intentionally gated until the MkI suite is mature; planned targets include minilogue xd, prologue, NTS-1 MkII, NTS-3, microKORG2 and drumlogue. See `PLATFORM_SUPPORT.md`.
 
 The goal is to separate three questions cleanly:
 
@@ -11,6 +11,24 @@ The goal is to separate three questions cleanly:
 3. **Does it load, run and sound good on that real hardware product?**
 
 These are related, but they are not the same result.
+
+---
+
+## Current A-class reference candidate
+
+As of 2026-09-11, all **29 tracked original-NTS-1 MkI units** pass the repository's shared production-DSP common gate and project-specific A-class engineering harnesses, and all 29 freshly compile/package in the consolidated ARM job.
+
+Reference evidence:
+
+- branch candidate: `field-0.1-0-test` @ `5718d12416a242137892688e240e8ac41be5a0ca`;
+- workflow: **Pre-handoff suite**, run `34613566166`;
+- common host gate: **29/29 PASS**;
+- project-specific A-class gate: **29/29 PASS**;
+- ARM build/package: **29/29 PASS**.
+
+See `PRE_HANDOFF_COVERAGE.md` and `reports/testing/2026-09-11_full-a-class-suite.md`.
+
+This is an **engineering** result. It does not convert known physical failures into passes. In particular, LATTICE CORE's high-TIME physical distortion and CORE + FIELD integration failure remain open until physical retest.
 
 ---
 
@@ -30,7 +48,7 @@ Cross-platform ports must identify their product/API separately and do not inher
 
 There are three useful contribution paths.
 
-### 1. Run the shared host engineering gate
+### 1. Run the host engineering gates
 
 Known CI environment: Ubuntu 22.04.
 
@@ -43,21 +61,19 @@ From the repository root:
 
 ```bash
 python3 tests/pre-handoff/run_suite.py
+python3 tests/pre-handoff/run_unit_specific.py
 ```
 
 Expected current result:
 
 ```text
 29/29 common-gate PASS
+29/29 project-specific A-class PASS
 ```
 
-Project-specific A-class harnesses can be run with:
+The shared runner and project-specific runner compile/execute the actual production DSP source using host stubs. FIELD's deeper capture/delivery suite is included in the 29-unit project-specific command.
 
-```bash
-python3 tests/pre-handoff/run_unit_specific.py
-```
-
-The shared runner compiles and executes the actual production DSP source using host stubs. It checks common numerical/state/delivery behavior. It is not a cycle-accurate emulator for any Korg product.
+These are not cycle-accurate emulators for the NTS-1.
 
 If you get a failure, report:
 
@@ -68,20 +84,20 @@ If you get a failure, report:
 - complete test output / sanitizer diagnostic;
 - whether the failure reproduces on a clean checkout.
 
-Do not modify production DSP merely to make a generic test pass until the test expectation has been checked against the unit's intended architecture.
+Do not modify production DSP merely to make a generic test pass until the test expectation has been checked against the unit's intended architecture. The A-class campaign has already found both genuine production lifecycle bugs and invalid generic-test assumptions; those must be distinguished.
 
 ### 2. Run the GitHub Actions pre-handoff suite
 
 On a fork, enable Actions and run the **Pre-handoff suite** workflow manually, or open a pull request that touches the watched test/effect/oscillator paths.
 
-The current workflow has two independent jobs:
+The workflow has two independent jobs:
 
 - `host-production-dsp`
 - `arm-build-package`
 
-The host job now also runs any checked-in project-specific A-class harnesses.
+The host job runs both the 29-unit common gate and the 29-unit project-specific A-class gate. The ARM job clones the current official Korg logue SDK and freshly builds/packages all tracked units.
 
-A successful workflow establishes the tested host/build layers for that commit. It does **not** prove physical hardware loading, CPU deadline margin or musical quality.
+A successful workflow establishes those tested host/build layers for that commit. It does **not** prove physical hardware loading, CPU deadline margin or musical quality.
 
 ### 3. Test on physical logue SDK hardware
 
@@ -98,20 +114,19 @@ Use `community/HARDWARE_TEST_REPORT.md` when reporting a device result and ident
 
 ---
 
-## How to help move units to A-class
+## How to improve an already A-class unit
 
-See `A_CLASS_REQUIREMENTS.md`.
+A is not a claim that testing is finished forever. Good community contributions include:
 
-The suite-wide common gate is already implemented. Most units still need **project-specific tests** that prove the behavior claimed by their QA/spec rather than merely proving that audio is finite.
+- a deterministic regression test for one newly discovered hardware or DSP bug;
+- a stronger measurement of a documented control relationship;
+- a longer wrap/feedback/expiry test;
+- additional low/normal/hot-level cases;
+- a pitch/timing measurement that is less brittle than an existing assertion;
+- a state-ownership/delivery test for a newly added capture behavior;
+- a DC/headroom/decay test for a changed nonlinear or feedback path.
 
-Good community contributions include:
-
-- a deterministic test for one documented control relationship;
-- a regression test for one known bug;
-- a long-run wrap/feedback/expiry test;
-- a pitch/timing measurement for an oscillator or clocked delay;
-- a state-ownership/delivery test for a capture processor;
-- a DC/headroom/decay test for a nonlinear or feedback processor.
+Every behavioral DSP change should extend or revise its tests in the same development cycle.
 
 Prefer small, auditable tests. One test should answer one clear engineering question.
 
@@ -138,7 +153,9 @@ Examples:
 
 ### Keep deterministic tests deterministic
 
-For stochastic/chaotic designs, use a fixed test seed or assert bounded/statistical behavior rather than exact waveform identity.
+For stochastic/chaotic designs, use a fixed test seed or assert bounded/statistical behavior rather than accidental waveform history.
+
+Fresh initialization should reproduce documented deterministic seeded behavior where the unit promises that property.
 
 ### Do not tune tests around one accidental waveform
 
