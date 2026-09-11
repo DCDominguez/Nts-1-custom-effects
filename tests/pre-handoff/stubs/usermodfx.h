@@ -1,6 +1,9 @@
 #pragma once
 #include <stdint.h>
 #include <math.h>
+
+#ifndef HS_TEST_FX_COMMON_API
+#define HS_TEST_FX_COMMON_API
 #define __sdram
 inline float q31_to_f32(int32_t x) { return (float)x / 2147483648.0f; }
 inline float fx_sinf(float x) { return sinf(6.2831853071795864769f * x); }
@@ -11,4 +14,6 @@ inline float fx_absf(float x) { return fabsf(x); }
 static float test_bpm = 120.0f;
 inline float fx_get_bpmf() { return test_bpm; }
 inline uint32_t fx_get_bpm() { return (uint32_t)(test_bpm * 10.0f + 0.5f); }
+#endif
+
 enum { k_user_modfx_param_time = 0, k_user_modfx_param_depth = 1 };
