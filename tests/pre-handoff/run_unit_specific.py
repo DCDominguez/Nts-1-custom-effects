@@ -30,6 +30,8 @@ CASES = [
     ("BUCKETLINE", TESTS / "test_bucketline.cpp"),
     ("LONGMEMORY", TESTS / "test_longmemory.cpp"),
     ("SHARD", TESTS / "test_shard.cpp"),
+    ("ABYSS", TESTS / "test_abyss.cpp"),
+    ("AUREOLE", TESTS / "test_aureole.cpp"),
     ("LATTICE CORE", TESTS / "test_lattice_core.cpp"),
 ]
 
