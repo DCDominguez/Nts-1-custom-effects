@@ -5,7 +5,7 @@
 
 namespace {
 
-static const uint32_t kMaxVoices = 4u;
+static const uint32_t kMaxVoices = 3u;
 static const float kLn2Over1200 = 0.0005776226504666211f;
 static const float kMaxSpreadCents = 20.0f;
 static const float kMaxDriftCents = 8.0f;
@@ -15,29 +15,28 @@ static const float kMaxPhaseIncrement = 0.45f;
 static const float kDriftSlew = 0.0008f;
 
 static const float kIntervalModes[8][kMaxVoices] = {
-  { 0.0f,  0.0f,  0.0f,  0.0f },
-  { 0.0f,  7.0f, 12.0f,-12.0f },
-  { 0.0f, 12.0f,-12.0f, 24.0f },
-  { 0.0f,  7.0f,  4.0f, 12.0f },
-  { 0.0f,  7.0f,  3.0f, 12.0f },
-  { 0.0f,  7.0f,  5.0f, 12.0f },
-  { 0.0f,  5.0f, 10.0f, 15.0f },
-  { 0.0f,  1.0f,  7.0f, 13.0f }
+  { 0.0f,  0.0f,   0.0f },
+  { 0.0f,  7.0f,  12.0f },
+  { 0.0f, 12.0f, -12.0f },
+  { 0.0f,  7.0f,   4.0f },
+  { 0.0f,  7.0f,   3.0f },
+  { 0.0f,  7.0f,   5.0f },
+  { 0.0f,  5.0f,  10.0f },
+  { 0.0f,  1.0f,   7.0f }
 };
 
-static const float kSpreadCoeffs[4][kMaxVoices] = {
-  { 0.0f,   0.0f,   0.0f, 0.0f },
-  {-1.0f,  +1.0f,   0.0f, 0.0f },
-  {-1.0f,   0.0f,  +1.0f, 0.0f },
-  {-1.0f,  -0.333f, +0.333f, +1.0f }
+static const float kSpreadCoeffs[3][kMaxVoices] = {
+  { 0.0f,  0.0f,  0.0f },
+  {-1.0f, +1.0f,  0.0f },
+  {-1.0f,  0.0f, +1.0f }
 };
 
 // Two incommensurate low-rate components per voice keep the drift independent
 // without resorting to audio-rate randomness.
-static const float kDriftHzA[kMaxVoices] = {0.11f, 0.17f, 0.23f, 0.31f};
-static const float kDriftHzB[kMaxVoices] = {0.071f, 0.113f, 0.151f, 0.197f};
-static const float kDriftPhaseA[kMaxVoices] = {0.00f, 0.23f, 0.51f, 0.79f};
-static const float kDriftPhaseB[kMaxVoices] = {0.41f, 0.67f, 0.12f, 0.86f};
+static const float kDriftHzA[kMaxVoices] = {0.11f, 0.17f, 0.23f};
+static const float kDriftHzB[kMaxVoices] = {0.071f, 0.113f, 0.151f};
+static const float kDriftPhaseA[kMaxVoices] = {0.00f, 0.23f, 0.51f};
+static const float kDriftPhaseB[kMaxVoices] = {0.41f, 0.67f, 0.12f};
 
 struct SpectraState {
   uint8_t voices;
@@ -97,7 +96,7 @@ static void update_harmonic_ratios() {
 static void update_spread_ratios() {
   uint32_t count_index = 0u;
   if (s.voices > 1u) count_index = static_cast<uint32_t>(s.voices - 1u);
-  if (count_index > 3u) count_index = 3u;
+  if (count_index > 2u) count_index = 2u;
 
   for (uint32_t i = 0u; i < kMaxVoices; ++i) {
     const float cents = kSpreadCoeffs[count_index][i] * kMaxSpreadCents * s.spread;
@@ -146,7 +145,7 @@ static inline float render_wave(float phase, float shape, float note_for_tables)
 }
 
 static void set_defaults() {
-  s.voices = 4u;
+  s.voices = 3u;
   s.harm_mode = 0u;
   s.spread = 0.25f;
   s.drift = s.drift_target = 0.15f;
@@ -238,7 +237,7 @@ void OSC_NOTEOFF(const user_osc_param_t *const params) { (void)params; }
 void OSC_PARAM(uint16_t index, uint16_t value) {
   switch (index) {
     case k_user_osc_param_id1:
-      s.voices = static_cast<uint8_t>((value > 3u ? 3u : value) + 1u);
+      s.voices = static_cast<uint8_t>((value > 2u ? 2u : value) + 1u);
       update_spread_ratios();
       break;
     case k_user_osc_param_id2:
