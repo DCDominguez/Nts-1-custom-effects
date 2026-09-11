@@ -2,6 +2,29 @@
 
 Target hardware: **Korg Nu:Tekt NTS-1 digital kit, original / MkI**.
 
+## Suite-wide pre-handoff policy — 2026-09-11
+
+FIELD's debugging workflow is now the default engineering model for **all Human Soon NTS-1 units**.
+
+Before a normal hardware handoff, we should reproduce and eliminate functional problems internally wherever possible by running the **actual production DSP** under deterministic host tests, then compile/package against the current original-NTS-1 SDK target.
+
+Read:
+
+- [`PRE_HANDOFF_PROTOCOL.md`](PRE_HANDOFF_PROTOCOL.md) — required internal layers and handoff contract;
+- [`PRE_HANDOFF_COVERAGE.md`](PRE_HANDOFF_COVERAGE.md) — per-unit backfill status.
+
+The intended DC handoff is now mostly:
+
+1. load/select the candidate on the physical NTS-1;
+2. perform the specifically identified short hardware-runtime sanity sweep;
+3. judge **tone, musicality, identity and playability**.
+
+Compilation alone is no longer sufficient for a normal handoff. A changed unit whose internal coverage is incomplete may still be handed over as an explicitly labeled **DIAGNOSTIC** build, but the missing coverage must be stated.
+
+Actual MkI loading and real-time deadline margin remain hardware-only facts; desktop tests must not be presented as proof of device CPU stability.
+
+---
+
 All 25 M1 units were reported functional on the physical original NTS-1 MkI. Later listening exposed a NEBULA clipping defect, so its quality gate has been reopened for the 0.1-1 hotfix. Functional operation and release-quality validation are tracked separately.
 
 ## M2 Wave 1 — 2026-09-09
@@ -66,22 +89,34 @@ IRONROT hardware note: the first M2 candidate worked, but CORROSION was reported
 
 ## QA rule
 
-Project-specific QA sheets remain the source of truth for regression testing. Future DSP milestones must still be rebuilt and retested on physical hardware before being marked validated.
+Project-specific QA sheets remain the source of truth for musical/device regression checks, but new or changed candidates also inherit the suite-wide internal pre-handoff gate.
+
+Future DSP milestones should therefore pass two different layers:
+
+- **internal engineering gate** — deterministic production-DSP tests + ARM build/package;
+- **physical/music gate** — actual MkI load/runtime sanity + DC's tone/musicality judgment.
 
 When a regression or new milestone is tested, record exact build/commit where possible, source/monitoring conditions, PASS/FAIL for applicable rows, concrete failure settings, and whether the defect is blocking.
 
 ## Current status
 
-- **M1:** all 25 units function on the physical original NTS-1 MkI; NEBULA has a newly identified clipping-quality defect and is awaiting 0.1-1 retest.
-- **M2 Wave 1:** 7/8 validated; IRONROT awaits 0.2-1 perceptual/level-match retest.
-- M3 is allowed only for units whose M2 gate has passed.
+- **M1:** all 25 historical M1 units function on the physical original NTS-1 MkI; NEBULA has a clipping-quality defect and is awaiting redesign/retest if reopened.
+- **M2 Wave 1:** historical validation remains recorded; future changes must adopt the new pre-handoff protocol.
+- **LATTICE FIELD:** first unit at deep suite-wide pre-handoff coverage and the reference workflow for future backfill.
+- **LATTICE CORE:** next highest-priority backfill because high-TIME physical distortion remains open.
 
-See [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the original suite-level validation record and GitHub Issues #7 and #8 for the active retest gates.
+See [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the original suite-level validation record.
 
-## Required testing layers before hardware handoff (2026-09-11)
+## Required testing layers before hardware handoff
 
-1. Internal correctness: run actual DSP through isolated, legato, dense and quiet/soft inputs; verify delivered responses during playing, capture ownership, expiry, clock/control transitions, ABI identifiers, bounded output and silence. A high capture count alone is not success. Cover every mode/division where scheduling changes. Document known failures and omissions; ordinary level checks and peak guards do not prove musical quality.
-2. Device integration/runtime: only a physical MkI can establish loading, actual knob/clock/source behavior, processing deadlines and CORE + FIELD coexistence. Compilation/memory fit and desktop speed are not hardware runtime validation.
-3. Musical judgment: DC evaluates echo presence, bloom, articulation and performance feel. Offline rendered examples and an optional dry recording of a failing input can shorten iteration; never require a recording before useful internal work. Synthetic input is not proof of the exact hardware cause.
+The detailed requirements now live in [`PRE_HANDOFF_PROTOCOL.md`](PRE_HANDOFF_PROTOCOL.md).
 
-Every handoff identifies the build, automated evidence, known limitations, and only the remaining device/listening checks. Reproduce deterministic failures internally before another device build. Preserve hardware feedback literally and distinguish inference. Pause for DC before additional unapproved improvements. Retain BUILD ONLY until physical validation.
+In short:
+
+1. **Internal correctness and delivery:** actual production DSP, deterministic input corpus, parameter extremes/sweeps, state ownership/expiry, wrap/feedback safety, finite output, rest behavior and unit-specific assertions.
+2. **Build/package integrity:** current official original-NTS-1 build target, manifest/API checks, memory sizes and `.ntkdigunit` packaging.
+3. **Physical MkI acceptance:** load/select, one short known worst-case runtime sweep, then tone/musicality/playability.
+
+A high internal activity count is not success unless the intended result reaches the output. This rule comes directly from FIELD's C-D-E failure investigation.
+
+Every handoff identifies the build, internal evidence, known limitations, and **only the remaining physical/listening checks**. Reproduce deterministic failures internally before another normal device build. Preserve hardware feedback literally and distinguish inference from observation.
