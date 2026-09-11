@@ -23,6 +23,13 @@ CASES = [
     ("CAPSTAN", TESTS / "test_capstan.cpp"),
     ("SIDEBAND", TESTS / "test_sideband.cpp"),
     ("FAULTLINE", TESTS / "test_faultline.cpp"),
+    ("BALLISTIC", TESTS / "test_ballistic.cpp"),
+    ("RAINFALL", TESTS / "test_rainfall.cpp"),
+    ("SWARMDELAY", TESTS / "test_swarmdelay.cpp"),
+    ("GLITCHREPEAT", TESTS / "test_glitchrepeat.cpp"),
+    ("BUCKETLINE", TESTS / "test_bucketline.cpp"),
+    ("LONGMEMORY", TESTS / "test_longmemory.cpp"),
+    ("SHARD", TESTS / "test_shard.cpp"),
     ("LATTICE CORE", TESTS / "test_lattice_core.cpp"),
 ]
 
