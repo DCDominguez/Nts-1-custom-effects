@@ -10,19 +10,18 @@ LATTICE is a generative phrase-and-space system built around one musical behavio
 
 Before changing LATTICE DSP:
 
-1. **`LATTICE_HISTORY.md`** — complete project history, physical hardware findings, failed architectures, and engineering lessons.
-2. **`LATTICE_FIELD_SPEC.md`** — current next-build specification and hard guardrails.
-3. **`LATTICE_REPORTING.md`** — mandatory update-reporting protocol for every meaningful development step.
-4. **`reports/lattice/`** — chronological design, build, CI, and physical-hardware update reports.
-5. **Issue #9** — raw physical MkI QA notes and open hardware gates.
+1. **`LATTICE_CURRENT_STATUS.md`** — fastest current-state entry point.
+2. **`LATTICE_HISTORY.md`** — project history, failed architectures, and durable engineering lessons.
+3. **`LATTICE_FIELD_SPEC.md`** — current FIELD design/implementation guardrails.
+4. **`LATTICE_REPORTING.md`** — mandatory reporting protocol.
+5. **`reports/lattice/`** — chronological build, CI, diagnosis, and physical MkI reports.
+6. **Issue #9** — raw physical MkI QA thread.
 
-Commit history records what changed. `LATTICE_HISTORY.md` records why. `reports/lattice/` records each development step as it happened.
+`LATTICE_CURRENT_STATUS.md` overrides older status wording in historical sections when they conflict.
 
 ---
 
 ## Current preferred MkI architecture
-
-The original three-custom-unit architecture has been retired as the preferred system target after physical MkI load-balance testing.
 
 ```text
 AUDIO IN / OSC
@@ -33,30 +32,68 @@ composition + microloops + performance loop/freeze
 LATTICE FIELD  [custom DELAY]
 finite clocked phrase response + pitch/stereo ghosts + spatial bloom
       ↓
-optional Korg internal REVERB
+optional Korg built-in REVERB only
       ↓
 OUTPUT
 ```
 
-### CORE — composer / looper
+The earlier three-custom-unit CORE + ECHO + SPACE architecture is historical and no longer the preferred MkI system target.
 
-Current implemented version: **0.3-0**.
+### MkI slot rule
 
-Role:
+User DELAY and user REVERB share the first-generation SDK memory regions and are not treated as a supported simultaneous pair. Therefore:
 
-- creates microloop composition from recent audio;
-- uses structured pitch rules plus rhythm/spacing/stereo variation;
-- uses 16 total microloop voices rather than the previous 32-voice stress design;
+- FIELD occupies the user DELAY role.
+- Any downstream reverb used simultaneously with FIELD on this MkI should be **built-in Korg reverb**.
+- Albedo, as a user REVERB, replaces the user DELAY role rather than coexisting with FIELD.
+
+See `reports/lattice/2026-09-11_sinevibes-comparison-slot-correction.md`.
+
+---
+
+## CORE — composer / looper
+
+**Current implemented version:** `0.3-0`  
+**Hardware status:** OPEN / FAIL-RETEST at high TIME.
+
+Current role:
+
+- recent-audio microloop composition;
+- structured pitch rules plus rhythm/spacing/stereo variation;
+- 16 total microloop voices in the current implementation;
 - low TIME includes a disengaged region;
-- maximum TIME becomes a recent-audio loop/freeze rather than maximum simultaneous density.
+- maximum TIME enters recent-audio freeze/loop behavior.
 
-CORE owns **composition**.
+### Confirmed physical MkI result
 
-### FIELD — response / memory / atmosphere
+CORE alone is clean through much of its range, but distortion appears around the user's approximate **3 o'clock and higher** TIME region. Lowering the incoming source level did **not** remove the distortion.
 
-Current status: **specification stage**.
+This weakens a simple input-headroom explanation. Current source cost rises strongly with TIME; a runtime/workload failure is the leading hypothesis, but no measured hardware CPU percentage exists and dense granular playback behavior remains a possible contributor.
 
-Module target: custom Delay (`delfx`).
+A host-side production-DSP probe also confirmed that ordinary microloop scheduling continues during settled freeze even when that work contributes negligibly to the audible result.
+
+### Proposed next diagnostic build — not yet implemented
+
+`CORE 0.3-1` runtime profile, pending approval:
+
+1. cap ordinary microloop playback at **10 active voices**;
+2. preserve current gain, patterns, history, loop rules, and FIELD 0.1-2;
+3. suspend ordinary microloop scheduling/processing when full freeze is engaged;
+4. add automated checks for the voice ceiling, freeze work suspension, state lifetime, and finite/bounded output;
+5. physically retest CORE from the reported ~3 o'clock region through maximum, then repeat with FIELD.
+
+Do not describe this as a proven CPU fix until hardware testing passes.
+
+---
+
+## FIELD — response / memory / atmosphere
+
+**Current implemented version:** `0.1-2` (`LatField`, custom `delfx`)  
+**Active development branch:** `field-0.1-0-test`  
+**Draft PR:** #10  
+**Hardware status:** standalone listening PASS for the reported test; overall validation OPEN.
+
+FIELD 0.1-2 supersedes the earlier attack-only capture behavior. It admits fresh attacks plus CLOCK-spaced captures while source input qualifies, maintains two owned captures, protects the first clear answer from replacement, and may retire lower-priority later phrase events under load.
 
 Controls:
 
@@ -73,7 +110,7 @@ Playback modes:
 
 FIELD owns **response, multiplication, memory, and spatial dissolution**.
 
-Its core behavior is:
+Its intended arc remains:
 
 ```text
 clear fragment
@@ -89,101 +126,82 @@ fat ethereal bloom
 silence
 ```
 
-FIELD must use finite seed phrases rather than an endless feedback delay. The spatial bloom is fed by playback events themselves and does not rely on a separate onset detector.
+### Confirmed physical MkI observations
 
-See `LATTICE_FIELD_SPEC.md` for implementation requirements.
+- FIELD 0.1-2 standalone: reported as playing exactly as intended. Treat as a listening PASS, not long-duration validation.
+- Corrosion + FIELD: reported working cleanly in the tested playing context.
+- Tested built-in MOD effects + FIELD: did not show the CORE-specific distortion in the reported tests.
+- Albedo + FIELD: not an independent simultaneous pair; consistent with the user DELAY/user REVERB slot-memory restriction.
+- CORE + FIELD: FAIL / RETEST; this is currently the supported pair with the strongest reported distortion.
+
+Preserve FIELD 0.1-2 as the current standalone sound-quality reference unless hardware evidence specifically requires a FIELD change.
 
 ---
 
 ## Historical standalone units
 
-The following remain in the repository and may still be useful independently:
+The repository still contains:
 
-- **LATTICE ECHO 0.3-0** — standalone clocked custom Delay experiment.
-- **LATTICE SPACE 0.3-0** — standalone spatial custom Reverb experiment.
+- **LATTICE ECHO 0.3-0** — historical standalone custom Delay experiment.
+- **LATTICE SPACE 0.3-0** — historical standalone custom Reverb experiment.
 
-They are no longer the preferred way to assemble the full MkI LATTICE system.
-
-The reason is physical hardware behavior, not compile failure: CORE + ECHO + SPACE can each run, and pairwise combinations are substantially more usable, but aggressive three-unit use repeatedly crossed into distortion/collapse on the target MkI.
+Their useful musical ideas were folded into FIELD, but the official MkI system no longer depends on running both as separate heavy custom processors.
 
 ---
 
-## Non-negotiable system doctrine
-
-### Repository reporting
-
-- Every meaningful architecture, DSP, control, gain, sound-quality, optimization, build, CI, or physical-test step must add a chronological report under `reports/lattice/` in the same development cycle.
-- Follow `LATTICE_REPORTING.md`.
-- Reports must distinguish design intent, CI result, inference, and physical MkI observation.
-- Durable lessons must also be folded into `LATTICE_HISTORY.md`; current target changes must update this file and/or `LATTICE_FIELD_SPEC.md`.
+## Non-negotiable doctrine
 
 ### Hardware truth
 
 - Compile/CI success is not physical validation.
+- Browser/host probes are diagnostic only.
 - Only physical original-MkI testing closes hardware gates.
-- Record only observed hardware behavior; do not invent tester telemetry.
+- Record only observed device behavior; do not invent telemetry.
 
 ### Intentionality
 
 - Randomize geometry more readily than harmony.
 - Prefer recognizable phrase grammar over unrelated stochastic events.
-- More activity should mean more musical behavior, not merely more gain or more simultaneous DSP.
+- More activity should mean more musical behavior, not simply more simultaneous DSP.
 
-### Audibility
+### Audibility and sound quality
 
-- The main effect identity must be obvious around useful middle settings.
-- First-order foreground events must not become inaudible simply to make room for more ghosts.
-- When overloaded, remove low-priority events before sacrificing the main response.
-
-### Source clarity and sound quality
-
+- Main effect identity must be obvious around useful middle settings.
+- Preserve foreground responses before low-priority ghosts.
 - Preserve a separate dry/source spine until final summing.
-- No avoidable clicks, zippering, DC buildup, runaway resonance, unintended mono collapse, limiter pumping, or cheap pitch artifacts.
+- No avoidable clicks, zippering, DC buildup, runaway resonance, accidental mono collapse, limiter pumping, or cheap pitch artifacts.
 - “Experimental” is not permission for degraded audio quality.
 
-### Finite behavior
+### Finite FIELD behavior
 
-- FIELD phrases must expire.
-- No wet self-recapture.
-- Use both event-count and absolute-TTL termination.
-- The system must always return to a real rest state.
+- phrases expire;
+- no wet self-recapture;
+- event-count and absolute-TTL termination remain hard safeguards;
+- the processor must return to a genuine rest state.
 
 ### Runtime/headroom
 
-- Perceived density does not need to equal simultaneous voice count.
-- Schedule work at event boundaries where possible.
-- Preserve runtime margin for CORE + FIELD together.
-- Peak guards are containment, not a substitute for correct gain structure.
+- perceived density does not need to equal simultaneous voice count;
+- schedule work at event boundaries where possible;
+- preserve margin for CORE + FIELD together;
+- peak guards are containment, not a substitute for correct gain structure.
 
----
+### Reporting
 
-## Clean-room inspiration
+Every meaningful architecture, DSP, control, gain, sound-quality, optimization, build, CI, hardware-test, diagnosis, or decision step must add a report under `reports/lattice/` in the same development cycle.
 
-The high-level reference remains musical behavior described in public Hologram Electronics Microcosm documentation: short repeated samples, multiple playback speeds, clocked/rearranged material, delay, looping, pitch movement, and spatial processing.
-
-LATTICE does not copy Microcosm algorithms, firmware, presets, UI, branding, or reverse-engineered behavior. The scheduler, phrase grammars, interval rules, stereo layout, capture logic, and bloom network are original.
-
----
-
-## Hardware/documentation context
-
-The project owner's physical original NTS-1 MkI reports firmware `N1.2` / v1.20 and panel `P1.0`. That device has audibly run custom ModFX + custom DelFX + custom RevFX together, including explicit BALLISTIC + ABYSS verification on fresh external audio.
-
-Korg's public first-generation SDK documentation nevertheless describes custom Delay and Reverb as sharing a runtime and ordinarily supports only one of those custom processor types at a time when both slots are enabled.
-
-LATTICE therefore does not assume that successful light triple-custom operation guarantees enough margin for a heavy three-stage custom system. The CORE + FIELD pivot is the practical response to repeated physical load-balance failure.
+Durable lessons belong in `LATTICE_HISTORY.md`; the fastest current truth belongs in `LATTICE_CURRENT_STATUS.md`.
 
 ---
 
 ## Current next milestone
 
-Implement FIELD from `LATTICE_FIELD_SPEC.md`, then physically establish:
+Do **not** rebuild FIELD merely because CORE pairing fails.
 
-- obvious intentional response at middle MIX;
-- finite phrase lifetime with no endless distinct repeats;
-- reliable bloom on every audible phrase;
-- fat BODY plus airy/ethereal HALO;
-- clear dry/source audio and clean foreground echoes;
-- no clicks/crunch/dropouts during CLOCK, MODE, or MIX sweeps;
-- CORE + FIELD aggressive-use stability;
-- extended physical MkI run before hardware validation.
+The next approved decision point is whether to implement the scoped **CORE 0.3-1 runtime diagnostic profile**. If approved, success means:
+
+1. CORE is clean from the reported ~3 o'clock TIME region through maximum on the physical MkI;
+2. full freeze no longer performs unnecessary ordinary microloop work;
+3. CORE + FIELD 0.1-2 can be pushed without the previously reported distortion collapse;
+4. FIELD retains its current standalone sound quality;
+5. extended physical MkI stability remains open until explicitly tested.

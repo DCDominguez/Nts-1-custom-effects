@@ -7,7 +7,7 @@ namespace {
 static const float kSampleRate = 48000.0f;
 static const uint32_t kBufferSize = 65536u;
 static const uint32_t kBufferMask = kBufferSize - 1u;
-static const uint32_t kMaxVoices = 16u;
+static const uint32_t kMaxVoices = 10u;
 static const float kParamSlew = 0.0015f;
 static const float kQ15Scale = 1.0f / 32768.0f;
 static const float kGuardCeiling = 0.86f;
@@ -57,8 +57,7 @@ static const float kWetNorm[kMaxVoices + 1u] = {
   0.000f,
   1.000f, 0.790f, 0.670f, 0.590f,
   0.535f, 0.495f, 0.462f, 0.435f,
-  0.412f, 0.392f, 0.374f, 0.358f,
-  0.344f, 0.332f, 0.321f, 0.311f
+  0.412f, 0.392f
 };
 
 static inline float absf(float x) { return x < 0.0f ? -x : x; }
@@ -137,11 +136,11 @@ static inline float read_frac_q15(float pos) {
 }
 
 static inline uint32_t voice_count(float t) {
-  // The bottom of TIME is a true disengaged region. Above it, sixteen voices
-  // are enough; complexity comes from how differently they are scheduled.
+  // The bottom of TIME is a true disengaged region. Above it, ordinary
+  // microloop density rises to a hard ten-voice MkI runtime ceiling.
   if (t < 0.035f) return 0u;
   const float x = clamp01((t - 0.035f) * (1.0f / 0.865f));
-  uint32_t n = 1u + static_cast<uint32_t>(x * 15.999f);
+  uint32_t n = 1u + static_cast<uint32_t>(x * 9.999f);
   if (n > kMaxVoices) n = kMaxVoices;
   return n;
 }
@@ -392,7 +391,12 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
     float wet_r = 0.0f;
     uint32_t sounding = 0u;
 
-    if (voices > 0u && s_filled > static_cast<uint32_t>(ms_to_samples(320.0f))) {
+    // Full freeze owns the processor while active. Ordinary microloop voices
+    // retain their state but do not schedule, read, advance, or emit until the
+    // freeze is released. This removes the avoidable high-TIME workload that
+    // the 0.3-0 host probe confirmed was still running under settled freeze.
+    if (!s_freeze_active && voices > 0u &&
+        s_filled > static_cast<uint32_t>(ms_to_samples(320.0f))) {
       for (uint32_t i = 0u; i < voices; ++i) {
         LoopVoice &v = s_voice[i];
         if (v.repeats_left == 0u) {
@@ -423,8 +427,12 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
     }
 
     // Retire voices above the current TIME population without stale tails.
-    for (uint32_t i = voices; i < kMaxVoices; ++i) {
-      s_voice[i].repeats_left = 0u;
+    // During freeze the ordinary engine is fully suspended, including this
+    // maintenance pass; the ceiling is applied again immediately on release.
+    if (!s_freeze_active) {
+      for (uint32_t i = voices; i < kMaxVoices; ++i) {
+        s_voice[i].repeats_left = 0u;
+      }
     }
 
     float normal_l = in_l;

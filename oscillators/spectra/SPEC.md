@@ -4,11 +4,11 @@
 **Target:** Korg Nu:Tekt NTS-1 digital kit (MkI)  
 **Module:** `osc`  
 **SDK:** logue SDK API `1.1-0`  
-**Status:** Draft v0.1
+**Current MkI version:** `0.2-1`
 
 ## 1. Product idea
 
-SPECTRA turns one played note into a controlled internal ensemble of up to four oscillator voices.
+SPECTRA turns one played note into a controlled internal ensemble of up to **three oscillator voices**.
 
 The voices share the same note event but can differ in:
 
@@ -20,6 +20,10 @@ The voices share the same note event but can differ in:
 - waveform state
 
 The design goal is **coherent instability**: the patch should remain identifiable while its internal relationships move.
+
+### Hardware-derived voice ceiling
+
+The earlier `0.2-0` build exposed four internal voices. Physical MkI listening reported that SPECTRA sounds great through three voices but begins to sound bad at four. The MkI release architecture therefore intentionally caps SPECTRA at three voices rather than compromising the approved sound to preserve a fourth voice.
 
 ## 2. Verified NTS-1 oscillator constraints
 
@@ -42,17 +46,9 @@ high byte = MIDI note
 low byte  = fine position 0–255 toward the next semitone
 ```
 
-The API supplies helpers including:
+The API supplies helpers including `osc_w0f_for_note()`, `osc_sinf()`, band-limited saw/square lookup functions, `osc_white()`, and `f32_to_q31()`.
 
-- `osc_w0f_for_note()`
-- `osc_sinf()`
-- band-limited saw/square lookup functions
-- `osc_white()`
-- `f32_to_q31()`
-
-The NTS-1 oscillator API is fixed at 48 kHz.
-
-The user oscillator can define up to six edit parameters. In addition, the NTS-1 supplies `SHAPE` and an alternate `ALT` parameter path.
+The NTS-1 oscillator API runs at 48 kHz. The user oscillator can define up to six edit parameters in addition to `SHAPE` and the alternate `ALT` path.
 
 ## 3. Signal architecture
 
@@ -60,9 +56,8 @@ The user oscillator can define up to six edit parameters. In addition, the NTS-1
 host pitch
    |
    +--> V1 phase --> waveform --> level --+
-   +--> V2 phase --> waveform --> level --+
-   +--> V3 phase --> waveform --> level --+--> normalize --> soft clip --> Q31 out
-   +--> V4 phase --> waveform --> level --+
+   +--> V2 phase --> waveform --> level --+--> normalize --> soft clip --> Q31 out
+   +--> V3 phase --> waveform --> level --+
         ^            ^
         |            |
      detune       SHAPE morph
@@ -75,116 +70,86 @@ The NTS-1 host filter/envelope/effects remain downstream and are not reimplement
 
 ## 4. Parameter model
 
-### 4.1 Performance controls
+### Performance controls
 
 #### SHAPE — Wave Morph
-
-Continuous morph:
 
 ```text
 0.00      0.33       0.66       1.00
 SINE ---- TRIANGLE ---- SAW ---- SQUARE
 ```
 
-The host `shape_lfo` signal is added to the base SHAPE value so the built-in NTS-1 LFO can animate SPECTRA timbre.
+The host `shape_lfo` signal is added to the base SHAPE value.
 
 #### ALT — Harmonic Amount
 
-`ALT` continuously moves the secondary voices from unison toward the selected `HarmMode` interval constellation.
+`ALT` continuously moves secondary voices from unison toward the selected `HarmMode` constellation.
 
-At ALT = 0:
-
-```text
-all active voices = unison swarm
-```
-
-At ALT = 1:
-
-```text
-voices reach the full interval constellation
-```
-
-This makes interval movement a performance control instead of a static patch choice.
-
-### 4.2 User OSC edit parameters
+### User OSC edit parameters
 
 | Parameter | Manifest range | Internal meaning |
 |---|---:|---|
-| `Voices` | 0–3 typeless | display 1–4; active voices = value + 1 |
+| `Voices` | 0–2 typeless | display 1–3; active voices = value + 1 |
 | `Spread` | 0–100% | static detune width, max target ±20 cents |
 | `Drift` | 0–100% | slow independent pitch deviation, max target about ±8 cents |
 | `HarmMode` | 0–7 typeless | selects one of eight interval constellations |
 | `Motion` | 0–100% | scales drift rates |
 | `Chaos` | 0–100% | per-note phase, tuning and level mutation |
 
+Values above the published `Voices` range are hard-clamped to three voices in production DSP.
+
 ## 5. Interval constellations
 
-The most important additional interval is placed on voice 2 so two-voice operation is already useful:
+The first three voices define the MkI constellations:
 
 ```text
-1 UNISON :  0,  0,   0,   0
-2 FIFTH  :  0, +7, +12, -12
-3 OCTAVE :  0,+12, -12, +24
-4 MAJOR  :  0, +7,  +4, +12
-5 MINOR  :  0, +7,  +3, +12
-6 SUS    :  0, +7,  +5, +12
-7 QUARTAL:  0, +5, +10, +15
-8 CLUSTER:  0, +1,  +7, +13
+1 UNISON :  0,  0,   0
+2 FIFTH  :  0, +7, +12
+3 OCTAVE :  0,+12, -12
+4 MAJOR  :  0, +7,  +4
+5 MINOR  :  0, +7,  +3
+6 SUS    :  0, +7,  +5
+7 QUARTAL:  0, +5, +10
+8 CLUSTER:  0, +1,  +7
 ```
 
 `ALT` scales these interval distances continuously from zero to the listed values.
 
-Example with MAJOR selected:
-
-```text
-ALT 0.00: 0,   0, 0,  0
-ALT 0.50: 0,+3.5,+2,+6
-ALT 1.00: 0,  +7,+4,+12
-```
-
-Frequency ratios are recalculated when `ALT` or `HarmMode` changes, not inside every sample calculation.
+The most important added interval remains on voice 2 so two-voice operation is already musically useful.
 
 ## 6. Detune and drift
 
 ### Static spread
 
-Spread coefficients depend on the active voice count so one voice remains exactly centered and multi-voice modes remain symmetrical:
+Spread coefficients depend on active voice count:
 
 ```text
 1 voice :  0
 2 voices: -1, +1
 3 voices: -1,  0, +1
-4 voices: -1, -0.333, +0.333, +1
 ```
 
-`Spread` scales these toward a maximum of approximately ±20 cents.
+`Spread` scales these toward approximately ±20 cents.
 
 ### Drift
 
-Each voice has its own low-rate oscillator:
+Each voice has independent low-rate components. Primary rate targets are approximately:
 
 ```text
 V1 ~0.11 Hz
 V2 ~0.17 Hz
 V3 ~0.23 Hz
-V4 ~0.31 Hz
 ```
 
-`Motion` scales the rates while `Drift` scales their pitch depth.
-
-The drift LFOs must not share phase or rate. Correlated motion would collapse the concept back toward ordinary vibrato.
+`Motion` scales the rates while `Drift` scales pitch depth. Drift sources must not move in lockstep.
 
 ## 7. Chaos
 
-Chaos is sampled primarily on NOTE ON, not regenerated continuously at audio rate.
+Chaos is sampled primarily on NOTE ON rather than regenerated continuously at audio rate.
 
-For each active voice it can perturb:
+For each active voice it can perturb phase start, fine tuning, and amplitude.
 
-- phase start
-- fine tuning
-- amplitude
-
-Bounds for v0.1:
+Bounds:
 
 ```text
 extra tuning: roughly ±4 cents max
@@ -192,40 +157,30 @@ level variation: roughly ±12% max
 phase: deterministic zero → increasingly random
 ```
 
-At Chaos = 0, repeated notes should be reproducible.
-
-At Chaos = 100, repeated notes should differ while remaining musically bounded.
+At Chaos = 0, repeated notes should be reproducible. At Chaos = 100, repeated notes may vary while remaining musically bounded.
 
 ## 8. Waveform engine
 
-The first engine morphs four waveform families:
+The engine morphs four waveform families:
 
 1. sine via `osc_sinf()`
 2. triangle generated algebraically
 3. band-limited saw via SDK lookup
 4. band-limited square via SDK lookup
 
-Band-limit table selection follows played pitch plus the active interval contribution.
+Band-limit table selection follows played pitch plus active interval contribution.
 
-The output of all active voices is normalized before conversion to Q31. A final light soft-clip stage may catch peaks but must not be used to hide chronic gain errors.
+The output of active voices is normalized before conversion to Q31. Final soft clipping is a safety stage, not the primary gain strategy.
 
 ## 9. Stereo constraint
 
 SPECTRA does **not** contain independent stereo placement.
 
-The original NTS-1 oscillator API writes one sample per frame, so all four voices are summed into a mono oscillator signal before the host voice path.
-
-Stereo is intentionally delegated to downstream processing:
-
-```text
-SPECTRA --> NTS-1 filter/envelope --> PARALLAX / modulation / delay / reverb --> stereo out
-```
-
-This separation keeps the oscillator API honest and makes PARALLAX a natural companion effect.
+The original NTS-1 oscillator API writes one sample per frame, so all three voices are summed into a mono oscillator signal before the host voice path. Stereo belongs downstream.
 
 ## 10. Failure behavior
 
-- invalid `Voices` value → clamp to 1–4
+- invalid `Voices` value → clamp to 1–3
 - invalid `HarmMode` → clamp to known mode
 - extreme pitch increment → clamp below unstable/Nyquist-adjacent range
 - summed voice level → normalize by active voice weights
@@ -239,10 +194,10 @@ No parameter state should produce NaN/Inf output.
 ### M0 — Toolchain
 - build Korg `nutekt-digital/dummy-osc`
 - package `.ntkdigunit`
-- load it on the physical NTS-1
+- load on physical NTS-1
 
-### M1 — Stable four-voice source
-- 1–4 voices
+### M1 — Stable source
+- 1–3 voices
 - SHAPE morph
 - static Spread
 - interval modes
@@ -267,28 +222,29 @@ No parameter state should produce NaN/Inf output.
 - tune normalization
 - inspect aliasing on high notes
 
-### M5 — SPECTRA + PARALLAX integration
-- run SPECTRA into PARALLAX
-- identify mono-to-stereo cancellation issues
-- define recommended constellations
+### Hardware correction — 0.2-1
+- retire fourth voice after MkI listening failure
+- hard-cap `Voices` at 3
+- preserve the sound that passed at 1–3 voices
 
-## 12. v0.1 acceptance criteria
+## 12. Acceptance criteria
 
 1. Builds as a valid original NTS-1 `osc` unit.
 2. Loads on firmware compatible with SDK 1.1-0.
 3. Tracks incoming NTS-1 pitch accurately.
-4. `Voices` audibly changes density from 1 to 4.
+4. `Voices` audibly changes density from 1 to 3 and cannot exceed 3.
 5. `Spread = 0` produces centered tuning.
 6. `SHAPE` morphs without clicks or large gain jumps.
-7. `ALT = 0` collapses all intervals to unison.
-8. `ALT = 100%` reaches the selected interval constellation.
+7. `ALT = 0` collapses intervals toward unison.
+8. `ALT = 100%` reaches the selected three-voice constellation.
 9. Drift voices do not move in lockstep.
 10. Chaos = 0 is repeatable; Chaos > 0 varies notes within bounds.
 11. High-register notes do not produce unacceptable aliasing.
-12. Continuous operation is stable for at least 30 minutes.
+12. Three-voice maximum retains the physically approved tone/musicality.
 
-## 13. Non-goals for v0.1
+## 13. Non-goals
 
+- restoring a fourth MkI voice unless new physical evidence justifies it
 - independent stereo placement inside the oscillator
 - internal filter clone
 - internal ADSR clone
@@ -297,18 +253,8 @@ No parameter state should produce NaN/Inf output.
 - spectral FFT/resynthesis
 - formant preservation
 
-## 14. Repository layout
+## 14. References
 
-```text
-oscillators/spectra/
-├── README.md
-├── SPEC.md
-├── docs/
-│   ├── dsp-architecture.md
-│   └── test-plan.md
-└── nts1/
-    ├── manifest.json
-    ├── project.mk
-    └── src/
-        └── spectra.cpp
-```
+- Korg logue SDK: https://github.com/korginc/logue-sdk
+- Original NTS-1 API reference: https://korginc.github.io/logue-sdk/ref/
+- Hardware decision report: `reports/testing/2026-09-12_spectra-three-voice-cap.md`

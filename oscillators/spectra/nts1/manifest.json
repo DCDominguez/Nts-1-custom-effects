@@ -5,11 +5,11 @@
     "api": "1.1-0",
     "dev_id": 0,
     "prg_id": 0,
-    "version": "0.2-0",
+    "version": "0.2-1",
     "name": "Spectra",
     "num_param": 6,
     "params": [
-      ["Voices",   0,   3, ""],
+      ["Voices",   0,   2, ""],
       ["Spread",   0, 100, "%"],
       ["Drift",    0, 100, "%"],
       ["HarmMode", 0,   7, ""],

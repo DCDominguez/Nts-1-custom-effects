@@ -1,8 +1,10 @@
 # SPECTRA
 
-SPECTRA is a four-voice swarm oscillator for the **Korg Nu:Tekt NTS-1 digital kit (MkI)**.
+SPECTRA is a three-voice swarm oscillator for the **Korg Nu:Tekt NTS-1 digital kit (MkI)**.
 
 A single played note becomes a small internal ensemble. The voices can be detuned, drift independently, and move into interval structures while the NTS-1 continues to provide the surrounding filter, envelope, LFO, modulation, delay, and reverb stages.
+
+The original 0.2-0 build exposed a fourth internal voice. Physical MkI listening found SPECTRA excellent through three voices but degraded at four, so 0.2-1 intentionally caps the architecture at three voices.
 
 ```text
 MIDI pitch
@@ -10,7 +12,6 @@ MIDI pitch
    +-- voice 1: root / detune / drift
    +-- voice 2: interval / detune / drift
    +-- voice 3: interval / detune / drift
-   +-- voice 4: interval / detune / drift
              |
          mono swarm
              |
@@ -25,9 +26,9 @@ Stereo placement belongs downstream — for example PARALLAX, another modulation
 
 ## Current stage
 
-The first scaffold implements:
+The current scaffold implements:
 
-- 1–4 internal oscillator voices
+- 1–3 internal oscillator voices
 - waveform morphing from sine → triangle → band-limited saw → band-limited square
 - static detune spread
 - eight interval constellations
@@ -51,7 +52,7 @@ This is an oscillator source only. The NTS-1 host still handles articulation and
 
 | Edit parameter | Role |
 |---|---|
-| `Voices` | 1–4 internal voices |
+| `Voices` | 1–3 internal voices |
 | `Spread` | static unison detune width |
 | `Drift` | independent slow pitch movement |
 | `HarmMode` | interval constellation 1–8 |
