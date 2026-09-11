@@ -33,6 +33,10 @@ on:
       - '.github/workflows/build-modfx.yml'
   workflow_dispatch:
 
+concurrency:
+  group: modfx-build-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-22.04
