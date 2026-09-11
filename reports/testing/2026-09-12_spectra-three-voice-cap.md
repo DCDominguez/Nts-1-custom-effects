@@ -39,16 +39,29 @@ The goal is not to recover the fourth voice through attenuation or compromise th
 
 Target remains original NTS-1 MkI `osc`, logue SDK API `1.1-0`. Korg's current official API reference still lists the original NTS-1 at v1.1-0.
 
-## Validation state
+## Automated validation
 
-The source/manifest/test change reopens the exact-build gate.
+Pre-handoff suite run: `34622696558` against commit `b918c982fc74a35cee22618f93aa48c71c0031ba`.
 
-Required before release:
+Results:
 
-- shared pre-handoff common gate PASS;
-- SPECTRA project-specific A-class harness PASS;
-- fresh ARM build/package PASS;
-- physical MkI load/select check of 0.2-1;
-- confirm Voices 1, 2 and 3 retain the approved tone/musicality.
+- shared production-DSP common gate: **PASS**;
+- SPECTRA project-specific A-class harness, including hard three-voice ceiling: **PASS**;
+- complete 29-unit project-specific harness run: **PASS**;
+- fresh ARM compile/package against current official Korg logue SDK clone: **PASS**;
+- ARM artifact: `10273342603` (`pre-handoff-arm-builds`), SHA-256 `628793d598bb42b37b7f63743b5c96eef7fa53c6e8f80b46d35be1794277f105`.
 
-The prior hardware report is sufficient to reject four voices, but does not automatically validate the new 0.2-1 binary until it is loaded on-device.
+Extracted SPECTRA 0.2-1 `.ntkdigunit` SHA-256:
+
+`20cfa8fb319017bc3d431220a82240125b43508ab5ed1f65d1d433536942bb10`
+
+## Current validation state
+
+Classification: **ENGINEERING PASS / PHYSICAL RETEST REQUIRED**.
+
+The prior hardware report is sufficient to establish that three voices are preferred and four voices should be removed. Because the production binary changed, the new 0.2-1 exact build still needs a brief MkI load/select/music regression:
+
+1. load/select successfully;
+2. confirm Voices exposes only 1–3;
+3. confirm Voices 1, 2 and 3 retain the approved tone/musicality;
+4. confirm no new note-transition, level or aliasing defect.
