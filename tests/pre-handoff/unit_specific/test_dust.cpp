@@ -51,6 +51,17 @@ static std::vector<float> sine(std::size_t frames, float hz, float amp) {
   return x;
 }
 
+static std::vector<float> deterministic_noise(std::size_t frames) {
+  std::vector<float> x(frames);
+  uint32_t state = 0x51f15eadu;
+  for (std::size_t i=0;i<frames;++i) {
+    state = state * 1664525u + 1013904223u;
+    const float u = static_cast<float>((state >> 8) & 0x00ffffffu) / 16777215.0f;
+    x[i] = (u * 2.0f - 1.0f) * 0.8f;
+  }
+  return x;
+}
+
 int main() {
   // Dry contract: DEPTH=0 must preserve source exactly after initialization/settling.
   MODFX_INIT(0,0);
@@ -60,20 +71,19 @@ int main() {
   auto dryL = hs_measure::channel(dry, 0);
   require(hs_measure::max_abs_diff(src, dryL) < 2e-6, "DEPTH=0 is not effectively dry");
 
-  // RATE contract: at full DAMAGE, increasing RATE must reduce output transition cadence.
+  // RATE contract: at full DAMAGE, increasing RATE must reduce sample-hold update cadence.
+  // Broadband deterministic input avoids a slow ramp being masked by the 4-bit quantizer at maximum DAMAGE.
   auto count_transitions = [&](float rate) {
     MODFX_INIT(0,0);
     settle(rate, 1.0f);
-    auto ramp = std::vector<float>(16384);
-    for (std::size_t i=0;i<ramp.size();++i) ramp[i] = -0.8f + 1.6f * static_cast<float>(i) / static_cast<float>(ramp.size()-1);
-    auto y = process_mono(ramp);
+    auto y = process_mono(deterministic_noise(32768));
     return hs_measure::transition_count(hs_measure::channel(y,0), 1e-5);
   };
   const std::size_t rate_lo = count_transitions(0.10f);
   const std::size_t rate_mid = count_transitions(0.55f);
   const std::size_t rate_hi = count_transitions(1.00f);
-  require(rate_lo > rate_mid * 1.4, "RATE low->mid did not reduce sample-hold cadence enough");
-  require(rate_mid > rate_hi * 1.4, "RATE mid->max did not reduce sample-hold cadence enough");
+  require(rate_lo > rate_mid * 2.0, "RATE low->mid did not reduce sample-hold cadence enough");
+  require(rate_mid > rate_hi * 1.5, "RATE mid->max did not reduce sample-hold cadence enough");
 
   // DAMAGE contract: with full-rate capture, increasing DAMAGE must reduce effective quantization resolution.
   auto level_count = [&](float damage) {
