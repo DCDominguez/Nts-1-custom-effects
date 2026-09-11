@@ -32,6 +32,18 @@ Actual MkI loading and real-time CPU/deadline margin cannot be certified by desk
 
 - [`PRE_HANDOFF_PROTOCOL.md`](PRE_HANDOFF_PROTOCOL.md) — suite-wide test and handoff requirements
 - [`PRE_HANDOFF_COVERAGE.md`](PRE_HANDOFF_COVERAGE.md) — current per-unit coverage/backfill matrix
+- [`A_CLASS_REQUIREMENTS.md`](A_CLASS_REQUIREMENTS.md) — exact requirements for deep A-class engineering coverage
+
+## Community testing
+
+The test system is intended to be reproducible outside the Human Soon development chat.
+
+Community members can run the shared production-DSP host gate locally or through GitHub Actions, contribute deeper project-specific regression tests, and submit physical original-NTS-1 MkI reports using a standard template.
+
+- [`COMMUNITY_TESTING.md`](COMMUNITY_TESTING.md) — local/CI testing instructions and contribution rules
+- [`community/HARDWARE_TEST_REPORT.md`](community/HARDWARE_TEST_REPORT.md) — physical MkI report template
+
+Current suite-wide baseline: **29/29 tracked units pass the shared production-DSP common gate and fresh ARM build/package gate.** This does not mean all 29 are A-class yet: most still need deeper unit-specific behavioral assertions. Engineering coverage and physical/music validation are deliberately tracked separately.
 
 ## LATTICE — active MkI system development
 
