@@ -26,9 +26,29 @@ No 30-minute soak or unreported effect combinations are inferred.
 
 See `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`.
 
-### LATTICE SPACE
+### LATTICE SPACE 0.4-0
 
-The previously tested 0.3-0 remains physically characterized as:
+Exact handed-off binary SHA-256: `de4dd4c7ccef1c435939b0c617df5a12532b29a4d3bf8af061604c5e46405bc7`  
+Pre-handoff workflow: `34635428252`
+
+The tester reports that SPACE 0.4-0 still distorts in combination with modulation:
+
+> “still hitting distortion on core with space. actually any modulation plus space i get distortion”
+
+Disposition:
+
+- SPACE 0.4-0 + CORE 0.3-1: **FAIL / RETEST** due to distortion;
+- more broadly, tester reports the same distortion with **any modulation + SPACE** in the current physical test;
+- this does **not** reopen CORE 0.3-1 by itself because CORE 0.3-1 separately passed standalone and CORE + FIELD 0.1-2 immediately beforehand;
+- no exact CPU/deadline, clipping, guard or analog-level cause is inferred from the sound alone.
+
+SPACE 0.4-0 is superseded for development by the focused 0.4-1 guard/headroom diagnostic. The 0.4-1 physical gate is open.
+
+See `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md` and issue #9 comment `5639386820`.
+
+### Earlier LATTICE SPACE 0.3-0 characterization
+
+The earlier 0.3-0 candidate was physically characterized as:
 
 - load/basic function PASS;
 - too subtle even at full MIX;
@@ -36,7 +56,7 @@ The previously tested 0.3-0 remains physically characterized as:
 - distorted sound quality when run with modulation;
 - redesign/revoice required.
 
-SPACE has therefore moved to a new 0.4-0 candidate. Any prior physical result does **not** validate 0.4-0; its exact-build physical gate is open until host/build gates pass and the new binary is tested.
+The 0.4-0 revoice solved its engineering/presence gates but **did not solve the physical modulation-combination distortion**, as recorded above.
 
 ---
 
@@ -66,7 +86,7 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 
 #### Reverb
 
-- **LATTICE SPACE 0.3-0** — very subtle even at full MIX; echo/spatial behavior is audible, but it distorts when run with modulation. **Redesign/revoice candidate; superseded for development by 0.4-0 candidate.**
+- **LATTICE SPACE** — the 0.3-0 and exact 0.4-0 candidates both physically exhibited distortion when run with modulation; 0.4-0 tester report broadens this to “any modulation plus space” in the current test. Current development candidate is 0.4-1; physical gate open.
 - **Other reverbs** — tested well, but perceived output level is too low.
 
 #### Delay
@@ -85,7 +105,10 @@ The tester loaded the A-class release-candidate pack on the physical original NT
 
 ### Combination testing
 
-Most ModFX + Delay/Reverb combinations tested well. The original RC's main recurring exception was LATTICE CORE 0.3-0. The later CORE 0.3-1 focused CORE + FIELD test passed as recorded above.
+Most ModFX + Delay/Reverb combinations tested well in the original RC pass. Later focused testing established:
+
+- CORE 0.3-1 + FIELD 0.1-2: **PASS**;
+- SPACE 0.4-0 after modulation: **FAIL / RETEST**, with tester reporting distortion for any modulation + SPACE in the current test.
 
 ### Status rule
 
@@ -93,7 +116,7 @@ This physical report is separate from the repository's A-class engineering grade
 
 Any DSP change made to address level, identity or distortion reopens the physical gate for that exact changed candidate.
 
-See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`, `reports/testing/2026-09-12_spectra-three-voice-cap.md`, `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`, and `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`.
+See `reports/testing/2026-09-12_a-class-rc-physical-mki.md`, `reports/testing/2026-09-12_spectra-three-voice-cap.md`, `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md`, `reports/lattice/2026-09-12_core-0.3-1-physical-pass.md`, and `reports/lattice/2026-09-12_space-0.4-1-guard-isolation.md`.
 
 ---
 
