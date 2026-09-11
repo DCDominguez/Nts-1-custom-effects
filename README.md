@@ -16,6 +16,23 @@ For the next-stage plan for active projects, see **[M2–M4 Milestones](MILESTON
 
 See [`TESTING.md`](TESTING.md) for the complete hardware status, [`HARDWARE_VALIDATION.md`](HARDWARE_VALIDATION.md) for the validation record, and [`effects/humansoon-suite/ROADMAP.md`](effects/humansoon-suite/ROADMAP.md) for the clean-room effects roadmap.
 
+## Pre-handoff engineering protocol
+
+FIELD's internal-debugging workflow is now the suite-wide standard.
+
+Before a normal hardware handoff, changed units should be exercised with deterministic tests using the **actual production DSP source** wherever possible: input-level cases, parameter extremes/sweeps, state delivery/expiry, buffer wraps, feedback/rest behavior, finite-output checks and unit-specific behavioral assertions. ARM compile/package still remains required, but compilation alone is not a normal handoff gate.
+
+The intended DC handoff is now mostly:
+
+1. load/select the `.ntkdigunit` on the physical NTS-1;
+2. perform one short hardware-only worst-case/runtime sanity sweep identified in the handoff notes;
+3. judge **tone, musicality, identity and playability**.
+
+Actual MkI loading and real-time CPU/deadline margin cannot be certified by desktop tests, so those remain physical checks. The goal is to stop using DC's hardware time for bugs we can reproduce internally.
+
+- [`PRE_HANDOFF_PROTOCOL.md`](PRE_HANDOFF_PROTOCOL.md) — suite-wide test and handoff requirements
+- [`PRE_HANDOFF_COVERAGE.md`](PRE_HANDOFF_COVERAGE.md) — current per-unit coverage/backfill matrix
+
 ## LATTICE — active MkI system development
 
 LATTICE is the current Human Soon generative phrase-and-space system for the original NTS-1 MkI.
@@ -124,15 +141,17 @@ Official Korg build bases:
 
 ## Development rule
 
-1. begin from a strong audible behavior or interaction idea
-2. implement one bounded milestone
-3. compile against Korg's current template in GitHub Actions
-4. package `.ntkdigunit`
-5. provide a project-specific QA sheet
-6. test on the physical original NTS-1
-7. only then expand/calibrate the DSP architecture
+1. begin from a strong audible behavior or interaction idea;
+2. implement one bounded milestone;
+3. create/extend deterministic production-DSP tests for the changed behavior;
+4. reproduce and resolve internally reproducible failures before normal handoff;
+5. compile against Korg's current original-NTS-1 template/API in GitHub Actions;
+6. package `.ntkdigunit` and record text/data/BSS;
+7. provide project-specific QA plus an exact handoff note stating only the remaining hardware/listening checks;
+8. DC performs load/select, the identified brief hardware-runtime sanity check, and tone/musicality judgment;
+9. only then expand/calibrate the DSP architecture.
 
-The consolidated CI workflow `.github/workflows/build-full-test-suite.yml` rebuilds every current unit in one run, records text/data/BSS sizes, and packages the binaries plus QA sheets as one test artifact.
+The consolidated CI workflow `.github/workflows/build-full-test-suite.yml` rebuilds every current unit in one run, records text/data/BSS sizes, and packages the binaries plus QA sheets as one test artifact. The suite-wide testing roadmap now also tracks deterministic host coverage in `PRE_HANDOFF_COVERAGE.md`.
 
 Any M2 or later DSP change reopens the hardware gate for the affected unit.
 
