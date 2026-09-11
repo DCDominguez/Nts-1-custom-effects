@@ -53,6 +53,13 @@ static void reset() {
   ph[1] = 0.23f;
   ph[2] = 0.51f;
   ph[3] = 0.77f;
+  del[0] = 2600.0f;
+  del[1] = 5200.0f;
+  del[2] = 8800.0f;
+  del[3] = 13000.0f;
+  tt = t = 0.5f;
+  dt = d = 0.45f;
+  mt = m = 0.35f;
 }
 
 } // namespace
@@ -93,9 +100,6 @@ void REVFX_PROCESS(float *x, uint32_t n) {
     wl /= ws;
     wrv /= ws;
 
-    // Bound the cloud before it reaches either the feedback memory or output.
-    // M1 used hard clipping at both points; this hotfix creates explicit
-    // headroom and uses soft limiting only inside the wet path.
     wl = softsat(wl * 0.90f);
     wrv = softsat(wrv * 0.90f);
 
@@ -103,13 +107,9 @@ void REVFX_PROCESS(float *x, uint32_t n) {
     const float inR = x[2u * i + 1u];
     const float fb = 0.10f + 0.42f * d;
 
-    // Reduced input injection + bounded feedback prevents full-scale sources
-    // from repeatedly slamming the delay memory into the ±1 hard limit.
     bL[w] = softsat(inL * 0.70f + wl * fb);
     bR[w] = softsat(inR * 0.70f + wrv * fb);
 
-    // Wet path is deliberately capped below unity so correlated dry/wet peaks
-    // have headroom throughout the MIX sweep.
     const float wet_gain = 0.78f;
     const float outL = inL * (1.0f - m) + wl * (m * wet_gain);
     const float outR = inR * (1.0f - m) + wrv * (m * wet_gain);
