@@ -1,15 +1,15 @@
 # Human Soon LATTICE — Current Status
 
-**Date:** 2026-09-11  
+**Date:** 2026-09-12  
 **Target:** original Korg Nu:Tekt NTS-1 digital kit MkI  
 **Active development branch:** `field-0.1-0-test`  
 **Stable/reference branch:** `lattice-suite`
 
-This file is the fastest current-state entry point. It summarizes the latest implemented versions, physical MkI findings, unresolved failures, and the next approved decision point. For historical reasoning, read `LATTICE_HISTORY.md`; for chronological evidence, read `reports/lattice/`.
+This is the fastest current-state entry point. For chronological evidence, read `reports/lattice/`; for historical reasoning, read `LATTICE_HISTORY.md`.
 
 ## Current architecture
 
-Preferred MkI system remains:
+Preferred MkI system:
 
 ```text
 AUDIO IN / OSC
@@ -23,89 +23,93 @@ optional Korg built-in REVERB only
 OUTPUT
 ```
 
-User DELAY and user REVERB are not treated as a supported simultaneous pair on MkI because they share SDK memory regions. Albedo is a user REVERB and therefore replaces FIELD rather than proving coexistence with it.
+User DELAY and user REVERB are not treated as a supported independent simultaneous pair on MkI because they share first-generation SDK memory regions.
+
+## Engineering status
+
+The full 29-unit suite, including CORE, FIELD, historical ECHO and historical SPACE, passes the repository's A-class engineering gate on candidate `5718d12416a242137892688e240e8ac41be5a0ca`:
+
+- 29/29 shared production-DSP common gate PASS;
+- 29/29 project-specific A-class harness PASS;
+- 29/29 fresh ARM build/package PASS;
+- final consolidated workflow `34613566166`.
+
+A-class is engineering coverage only. Physical MkI findings below remain stronger evidence for actual runtime/tone behavior.
 
 ## FIELD
 
-**Current implemented version:** `0.1-2` (`LatField`, custom `delfx`)  
-**Branch:** `field-0.1-0-test`  
-**Hardware validation:** OPEN overall; standalone listening behavior PASS for the reported test.
+**Version:** `0.1-2` (`LatField`, custom `delfx`)  
+**Physical status:** **LOAD PASS / RUNTIME PASS / MUSICAL PASS for the latest reported playing test**.
 
-FIELD 0.1-2 supersedes the earlier attack-only capture rules. It admits fresh attacks plus CLOCK-spaced captures while source input qualifies, keeps two owned captures, protects the first clear answer from replacement, and may retire lower-priority later events when busy.
+FIELD remains the preferred delay/spatial stage for the current MkI LATTICE architecture. No new issue was reported during the 2026-09-12 A-class release-candidate physical pass.
 
-### Confirmed physical MkI observations
+Previously confirmed:
 
-- FIELD 0.1-2 standalone: user reported it was “perfect” and played exactly as intended. Treat this as a standalone listening PASS, not a 30-minute stability certification.
-- Corrosion + FIELD: reported clean / working perfectly in the tested playing context.
-- Tested built-in MOD effects + FIELD: reported without the CORE-specific distortion seen later.
-- Albedo + FIELD: does not operate as an independent simultaneous pair; this is consistent with the MkI user DELAY / user REVERB slot-memory limitation.
-- Earlier reports of occasional distortion with some built-in effects and other custom combinations are not fully resolved; do not generalize beyond the exact confirmed pairings above.
+- standalone listening behavior: plays as intended;
+- Corrosion + FIELD: clean in the tested playing context;
+- Albedo + FIELD is not treated as an independent simultaneous user-REVERB + user-DELAY pair on MkI.
 
-### FIELD status rule
-
-Do not reduce FIELD sound quality merely to compensate for failures proven to originate in CORE or in unsupported DELAY+REVERB combinations. FIELD 0.1-2 is the current standalone sonic reference.
+Preserve FIELD's current sound unless later physical evidence requires a change.
 
 ## CORE
 
-**Current implemented version:** `0.3-0`  
-**Hardware validation:** OPEN for high TIME.
+**Version:** `0.3-0`  
+**Physical status:** **PASS WITH NOTES / RETEST**.
 
-### Confirmed physical MkI observation
+Latest physical MkI observation:
 
-CORE alone is clean through much of the TIME range, but distortion appears around the user's approximate **3 o'clock and higher** TIME region. Lowering incoming source level did **not** remove that distortion.
+- CORE loads and sounds good;
+- at maximum TIME it loops the note using the current freeze/loop behavior;
+- intermittent distortion still appears at or near maximum TIME;
+- CORE can also distort when paired with another effect, although some combinations/runs are clean.
 
-This materially weakens a simple input/headroom-overload explanation for the CORE-alone failure.
+This refines the earlier blanket high-TIME failure description. CORE is not always unusable at high TIME; instead, extreme TIME and some multi-effect conditions remain intermittently unstable.
 
-Current source maps that region to roughly 14 active microloop voices, rising to 16 at maximum TIME. The per-sample workload and granular density both increase with TIME. A real-time workload failure is therefore the leading hypothesis, but there is no measured CPU percentage and dense granular playback artifacts are still a possible contributor.
+The A-class host harness passes and does not reproduce a fatal numerical/state defect. No measured device CPU percentage exists, so runtime/workload remains a hypothesis rather than a proven cause.
 
-## CORE + FIELD
+## SPACE
 
-**Status:** FAIL / RETEST.
+**Version:** historical `0.3-0` custom `revfx`  
+**Physical status:** **FAIL / REDESIGN CANDIDATE for musical quality/combination robustness**.
 
-Physical testing identified CORE + FIELD as the supported pair with the most distortion. A host-side chain probe using the actual production DSP reproduced substantial guard engagement as CORE activity rose, but did not produce full-scale clipping or non-finite output. That probe diagnoses a strong level/work interaction; it does not reproduce the exact audible hardware failure or prove a CPU cause.
+Latest physical MkI observation:
 
-The probe also confirmed that CORE continues ordinary microloop scheduling during settled freeze even when that work contributes negligibly to the audible output.
+- loads and produces the intended echo/spatial behavior;
+- remains very subtle even at full MIX;
+- distorts when run with modulation in the reported test;
+- the effect remains audible underneath the distorted sound quality.
 
-## Proposed next diagnostic build — pending approval
+SPACE should not receive a simple global gain boost. It needs a rework/revoice that improves standalone identity while maintaining safe local gain/headroom in combinations.
 
-Proposed `CORE 0.3-1` runtime profile:
+SPACE remains historical and is not part of the preferred CORE → FIELD architecture.
 
-1. Cap the ordinary microloop engine at **10 active voices** instead of 16.
-2. Preserve current gain, patterns, history, loop rules, and FIELD 0.1-2.
-3. When full freeze is engaged, suspend ordinary microloop scheduling/processing and keep only the frozen-loop output path active.
-4. Add automated checks for the 10-voice ceiling, freeze work suspension, state lifetime, and finite/bounded output.
-5. Physically test CORE alone from the reported ~3 o'clock region through maximum, then repeat with FIELD enabled.
+## ECHO
 
-This is a scoped runtime diagnostic, not yet an implemented fix and not a claim that 10 voices will solve the hardware issue.
+**Version:** historical `0.3-0` custom `delfx`  
+**Physical status:** **LOAD PASS / RUNTIME PASS / MUSICAL PASS for the latest reported playing test**.
 
-## Current evidence hierarchy
+No new problem was reported in the 2026-09-12 A-class release-candidate physical pass. ECHO remains historical rather than the preferred LATTICE delay stage.
 
-### Physical MkI — strongest evidence
+## System-level physical findings
 
-- FIELD 0.1-2 standalone: PASS for reported listening behavior.
-- Corrosion + FIELD: PASS for reported playing test.
-- CORE 0.3-0 high TIME: FAIL / RETEST; distortion persists at lower input.
-- CORE + FIELD: FAIL / RETEST.
-- Albedo + FIELD: unsupported user REVERB + user DELAY arrangement.
+Most modulation + delay/reverb pairings were reported to work well. The main LATTICE exception remains CORE, which can distort intermittently in combinations.
 
-### Host/CI evidence — useful but not hardware validation
+Do not solve these findings by globally lowering every LATTICE processor. The user requirement is that each effect should stand strongly on its own.
 
-- FIELD 0.1-2 builds successfully through the dedicated workflow.
-- Host-side production-DSP chain probe shows increasing CORE/FIELD guard activity with CORE TIME and confirms avoidable ordinary CORE work during freeze.
-- No ARM cycle measurement or hardware CPU telemetry exists.
+Current doctrine:
 
-## Guardrails carried forward
+- standalone identity must be obvious;
+- multi-effect safety comes from correct local gain structure, bounded regenerative paths and efficient runtime behavior;
+- FIELD is preserved as the current preferred delay reference;
+- SPACE is a redesign candidate;
+- CORE keeps its sound/loop identity while the intermittent extreme-TIME/combination distortion is isolated.
 
-- Compile/CI success is never hardware validation.
-- Preserve FIELD 0.1-2 as the current sound-quality reference unless hardware evidence requires a FIELD change.
-- Do not call the CORE failure “CPU overload” as a measured fact; call it the leading runtime-workload hypothesis.
-- Do not solve supported-pair failures by degrading audible quality before removing demonstrably unnecessary work.
-- Keep update reports under `reports/lattice/` for every meaningful build, test, failure, diagnosis, or decision.
+## Next work
 
-## Next decision point
+1. Add reproducible level/loudness instrumentation to the pre-handoff suite so under-level/over-level candidates can be detected before physical handoff.
+2. Keep FIELD unchanged unless later hardware evidence requires a change.
+3. Rework SPACE for stronger standalone presence plus combination-safe gain structure.
+4. Continue CORE maximum-TIME and multi-effect fault isolation without assuming a measured CPU cause.
+5. Re-run full A-class host/build gates for every changed candidate before physical MkI handoff.
 
-Await approval before implementing CORE 0.3-1. If approved, the primary success question is:
-
-> Does CORE become clean from the reported ~3 o'clock TIME region through maximum on the physical MkI, first standalone and then with FIELD 0.1-2?
-
-If not, preserve the failure and investigate granular playback/runtime structure rather than immediately lowering FIELD quality or overall output level.
+See `reports/lattice/2026-09-12_a-class-rc-lattice-hardware.md` for the latest detailed physical report.
