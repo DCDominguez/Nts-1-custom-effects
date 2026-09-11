@@ -1,0 +1,79 @@
+name: Full Pre-Handoff Retest
+
+on:
+  push:
+    branches: [pre-handoff-retest-all]
+    paths:
+      - 'effects/**'
+      - 'oscillators/**'
+      - 'tests/pre-handoff/**'
+      - 'tests/lattice-field/**'
+      - 'tests/lattice-chain/**'
+      - '.github/workflows/pre-handoff-full-suite.yml'
+      - 'PRE_HANDOFF_PROTOCOL.md'
+      - 'PRE_HANDOFF_COVERAGE.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-production-dsp:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run common production-DSP suite with ASan/UBSan
+        run: python3 tests/pre-handoff/run_suite.py
+      - name: Run existing CORE + FIELD production-chain diagnostic
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/pre-handoff-host
+          g++ -std=c++11 -O1 -g -Wall -Wextra -fsanitize=address,undefined -fno-omit-frame-pointer \
+            -I tests/lattice-chain -I tests/lattice-field/stubs \
+            tests/lattice-chain/probe.cpp -o /tmp/lattice-chain-probe
+          /tmp/lattice-chain-probe | tee artifacts/pre-handoff-host/LATTICE-CHAIN-PROBE.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Pre-Handoff-Host-Results
+          path: artifacts/pre-handoff-host/
+          if-no-files-found: warn
+          retention-days: 30
+
+  arm-build-package:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi zip
+      - name: Fetch reviewed original NTS-1 logue SDK
+        uses: actions/checkout@v4
+        with:
+          repository: korginc/logue-sdk
+          ref: f6f073bb83d5ef69310fca609c41ddcf722dd558
+          path: logue-sdk
+          submodules: recursive
+      - name: Rebuild and verify every tracked unit
+        run: python3 tests/pre-handoff/build_arm_suite.py logue-sdk
+      - name: Record provenance
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p artifacts/pre-handoff-arm
+          {
+            echo "Project commit: $GITHUB_SHA"
+            echo "Workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Korg SDK: $(git -C logue-sdk rev-parse HEAD)"
+            arm-none-eabi-gcc --version | head -1
+            echo "Physical MkI validation: NOT performed by this workflow"
+          } > artifacts/pre-handoff-arm/PROVENANCE.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Pre-Handoff-ARM-Results
+          path: artifacts/pre-handoff-arm/
+          if-no-files-found: warn
+          retention-days: 30
