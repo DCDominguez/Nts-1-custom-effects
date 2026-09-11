@@ -17,7 +17,7 @@ static void require(bool ok, const char* message) {
 
 static void base_patch(uint8_t voices = 1) {
   OSC_INIT(0, 0);
-  OSC_PARAM(k_user_osc_param_id1, voices - 1u); // 0..3 => 1..4 voices
+  OSC_PARAM(k_user_osc_param_id1, voices - 1u); // 0..2 => 1..3 voices
   OSC_PARAM(k_user_osc_param_id2, 0);           // Spread
   OSC_PARAM(k_user_osc_param_id3, 0);           // Drift
   OSC_PARAM(k_user_osc_param_id4, 0);           // HarmMode UNISON
@@ -64,6 +64,13 @@ static double adjacent_window_delta(const std::vector<float>& x, std::size_t win
 }
 
 int main() {
+  // Hardware-derived contract: SPECTRA sounded excellent at 1-3 voices on the
+  // physical MkI, while the fourth voice degraded the result. Values above the
+  // published range must therefore hard-clamp to three voices.
+  OSC_INIT(0, 0);
+  OSC_PARAM(k_user_osc_param_id1, 3);
+  require(s.voices == 3u, "Voices parameter exceeded the three-voice hardware-approved cap");
+
   // Pitch contract: single-voice sine should track equal-tempered test notes.
   base_patch(1);
   for (const auto& test : std::vector<std::pair<uint8_t, double>>{{57,220.0},{69,440.0},{81,880.0}}) {
@@ -84,7 +91,7 @@ int main() {
   require(sine1 > 1e-4 && square1 > 1e-4, "SHAPE endpoints lost fundamental delivery");
   require(square3 / square1 > std::max(0.015, (sine3 / sine1) * 2.5), "SHAPE square endpoint lacks expected harmonic enrichment");
 
-  // Voices + Spread contract: one voice ignores multi-voice spread geometry; four voices create symmetric detuned energy.
+  // Voices + Spread contract: one voice ignores multi-voice spread geometry; three voices create symmetric detuned energy.
   base_patch(1);
   OSC_PARAM(k_user_osc_param_id2, 100);
   auto one_spread = render(69, 96000);
@@ -92,23 +99,22 @@ int main() {
   const double upper = 440.0 * std::pow(2.0,  20.0 / 1200.0);
   const double one_side = hs_measure::tone_power(one_spread, lower, 48000.0, 4096) +
                           hs_measure::tone_power(one_spread, upper, 48000.0, 4096);
-  base_patch(4);
+  base_patch(3);
   OSC_PARAM(k_user_osc_param_id2, 100);
-  auto four_spread = render(69, 96000);
-  const double four_side = hs_measure::tone_power(four_spread, lower, 48000.0, 4096) +
-                           hs_measure::tone_power(four_spread, upper, 48000.0, 4096);
-  require(four_side > one_side * 3.0 + 1e-5, "Voices/Spread did not create expected detuned side energy");
+  auto three_spread = render(69, 96000);
+  const double three_side = hs_measure::tone_power(three_spread, lower, 48000.0, 4096) +
+                            hs_measure::tone_power(three_spread, upper, 48000.0, 4096);
+  require(three_side > one_side * 3.0 + 1e-5, "Voices/Spread did not create expected detuned side energy");
 
-  // HarmMode + ALT contract: mode 1 at full ALT must deliver root, fifth, octave and sub-octave components.
-  base_patch(4);
+  // HarmMode + ALT contract: mode 1 at full ALT must deliver root, fifth and octave components.
+  base_patch(3);
   OSC_PARAM(k_user_osc_param_id4, 1);
   OSC_PARAM(k_user_osc_param_shiftshape, 1023);
   auto harmony = render(69, 144000);
   const double p_root = hs_measure::tone_power(harmony, 440.0, 48000.0, 4096);
   const double p_fifth = hs_measure::tone_power(harmony, 440.0 * std::pow(2.0, 7.0/12.0), 48000.0, 4096);
   const double p_oct = hs_measure::tone_power(harmony, 880.0, 48000.0, 4096);
-  const double p_sub = hs_measure::tone_power(harmony, 220.0, 48000.0, 4096);
-  require(p_root > 1e-4 && p_fifth > 1e-4 && p_oct > 1e-4 && p_sub > 1e-4,
+  require(p_root > 1e-4 && p_fifth > 1e-4 && p_oct > 1e-4,
           "HarmMode/ALT failed to deliver one or more specified interval voices");
 
   // Drift contract: zero drift remains substantially steadier than maximum drift.
@@ -145,11 +151,11 @@ int main() {
   auto clean_b = render(69, 24000);
   require(hs_measure::max_abs_diff(clean_a, clean_b) < 1e-5, "Chaos=0 depends on random seed");
 
-  base_patch(4);
+  base_patch(3);
   OSC_PARAM(k_user_osc_param_id6, 100);
   osc_rng_state = 0x12345678u;
   auto chaos_a = render(69, 24000);
-  base_patch(4);
+  base_patch(3);
   OSC_PARAM(k_user_osc_param_id6, 100);
   osc_rng_state = 0x87654321u;
   auto chaos_b = render(69, 24000);
