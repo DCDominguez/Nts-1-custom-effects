@@ -42,6 +42,13 @@ static float s_time = 0.0f;
 static float s_pattern = 0.0f;
 static float s_guard_gain = 1.0f;
 
+// Fixed two-pole low-pass state used only for material written into the
+// microloop/freeze history. The dry path remains full-band. Coefficients are a
+// 9 kHz Butterworth low-pass at 48 kHz, chosen to reduce fold-back when CORE
+// later replays history above unity speed without adding per-voice filter cost.
+static float s_capture_z1 = 0.0f;
+static float s_capture_z2 = 0.0f;
+
 static bool s_freeze_active = false;
 static uint32_t s_freeze_start = 0u;
 static uint32_t s_freeze_samples = 0u;
@@ -96,6 +103,14 @@ static inline float guard_pair(float &l, float &r) {
   l *= s_guard_gain;
   r *= s_guard_gain;
   return peak;
+}
+
+static inline float filter_capture(float x) {
+  // RBJ / bilinear 2-pole Butterworth LPF, fc = 9 kHz, fs = 48 kHz.
+  const float y = 0.186694333f * x + s_capture_z1;
+  s_capture_z1 = 0.373388666f * x + 0.462938025f * y + s_capture_z2;
+  s_capture_z2 = 0.186694333f * x - 0.209715358f * y;
+  return y;
 }
 
 static inline float ms_to_samples(float ms) {
@@ -249,8 +264,15 @@ static int modulated_interval(uint32_t pattern, uint32_t event, float mod) {
     if (r < octave_prob * 0.55f) semi += 12;
     else if (r < octave_prob) semi -= 12;
   }
-  if (semi > 24) semi -= 12;
-  if (semi < -24) semi += 12;
+
+  // Physical MkI testing isolated the remaining combination fault to bright,
+  // higher-register material. The previous stochastic octave extension could
+  // create +17/+19/+24-semitone playback (up to 4x history rate), making
+  // fold-back likely on harmonically rich sources. Keep the designed octave-up
+  // vocabulary but do not let stochastic extension exceed +12. Downward motion
+  // retains the previous two-octave range.
+  if (semi > 12) semi = 12;
+  if (semi < -24) semi = -24;
   return semi;
 }
 
@@ -327,6 +349,8 @@ static void reset_state(void) {
   s_time_target = s_time = 0.0f;
   s_pattern_target = s_pattern = 0.0f;
   s_guard_gain = 1.0f;
+  s_capture_z1 = 0.0f;
+  s_capture_z2 = 0.0f;
   s_freeze_active = false;
   s_freeze_start = 0u;
   s_freeze_samples = 0u;
@@ -378,7 +402,10 @@ void MODFX_PROCESS(const float *main_xn, float *main_yn,
     s_freeze_mix += (freeze_target - s_freeze_mix) * 0.0012f;
 
     if (!s_freeze_active) {
-      s_buffer[s_write] = f32_to_q15_local(mono);
+      // Only the material used by CORE's variable-rate history path is
+      // conditioned. The live/dry signal bypasses this filter completely.
+      const float history_sample = filter_capture(mono);
+      s_buffer[s_write] = f32_to_q15_local(history_sample);
       s_write = (s_write + 1u) & kBufferMask;
       if (s_filled < kBufferSize) ++s_filled;
     }
