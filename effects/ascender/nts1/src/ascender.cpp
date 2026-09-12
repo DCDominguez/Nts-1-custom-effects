@@ -1,6 +1,7 @@
 #include "usermodfx.h"
 #include <stdint.h>
 
+// ASCENDER 0.2-0: physical-listening revoice; see SPEC.md and A-class test.
 namespace {
 static constexpr float SR = 48000.0f;
 static float zL[3][4] = {}, zR[3][4] = {};
