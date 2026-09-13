@@ -150,7 +150,9 @@ static inline void place_stereo_image(const float input_l,
   // At full PULL the two original channels retain 56% separation, but both
   // travel with the ball. At zero PULL their positions remain hard L/R.
   const float half_width = 1.f - .72f * pull;
-  const float image_center = s_ball_x * (1.f - half_width);
+  // Leave a small guard band at the walls so neither channel ever hard-switches
+  // completely off and the square-root gain law keeps a bounded derivative.
+  const float image_center = .94f * s_ball_x * (1.f - half_width);
   const float left_position = image_center - half_width;
   const float right_position = image_center + half_width;
 
