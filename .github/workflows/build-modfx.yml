@@ -76,6 +76,13 @@ jobs:
           make GCC_BIN_PATH=/usr/bin install
           arm-none-eabi-size build/${{ matrix.name }}.elf
           ls -lh ${{ matrix.name }}.ntkdigunit
+      - name: Export Attractor unit for local delivery
+        if: matrix.name == 'attractor'
+        run: |
+          echo "ATTRACTOR_NTKDIGUNIT_BASE64_BEGIN"
+          base64 -w 0 logue-sdk/platform/nutekt-digital/attractor/attractor.ntkdigunit
+          echo
+          echo "ATTRACTOR_NTKDIGUNIT_BASE64_END"
       - name: Stage artifact
         run: |
           mkdir -p artifacts
