@@ -1,45 +1,58 @@
-# ATTRACTOR Hardware QA Sheet
+# ATTRACTOR 0.3 Hardware QA Sheet
 
-Status: **NOT YET HARDWARE VALIDATED**
+Status: **HOST TESTED; HARDWARE RETEST REQUIRED**
 
 ## Build record
+
 - Build / commit: ____________________
 - `.ntkdigunit`: `attractor.ntkdigunit`
 - NTS-1 firmware: ____________________
 - Sound Librarian: ____________________
 - Date / tester: ____________________
 
-## Load / bypass behavior
-- [ ] Loads/selects normally
-- [ ] DEPTH=0 preserves original stereo signal
+## Transparency and continuity
+
+- [ ] DEPTH 0 is sample-for-sample dry
+- [ ] No click/step during sustained notes at any TIME setting
+- [ ] Wall impacts reverse direction without discontinuity
 - [ ] Silence remains silent
 
-## RATE / TIME
+## ENERGY / TIME
+
 Test 0 / 25 / 50 / 75 / 100%.
-- [ ] Motion speed increases
-- [ ] Motion never becomes a simple obvious repeating sine
-- [ ] No zipper/click on normal sweep
 
-## ORBIT / DEPTH
-- [ ] 0% centered/original
-- [ ] 25/50/75% progressively wider motion
-- [ ] 100% remains bounded
-- [ ] Neither channel permanently disappears
-- [ ] Mono collapse acceptable
+- [ ] Low values drift and bounce slowly
+- [ ] Speed and direction-change activity rise progressively
+- [ ] Momentum remains audible between force changes
+- [ ] 100% stays fluid and does not become tremolo/stutter
 
-## Abuse / stability
-- [ ] Rapid TIME sweep 30 s
-- [ ] Rapid DEPTH sweep 30 s
-- [ ] Switch away/back recovers safely
-- [ ] 30-minute RATE=100%, ORBIT=100% stability
+## PULL / DEPTH
+
+- [ ] 0% is transparent
+- [ ] 50% produces obvious left-to-right travel
+- [ ] 100% produces wide movement without hard L/R switching
+- [ ] Mono input travels clearly
+- [ ] Stereo input travels as one image while retaining width
+- [ ] Output stays bounded
+
+## Reset and abuse
+
+- [ ] Re-selecting ATTRACTOR restarts the same trajectory
+- [ ] Suspend/resume restarts the same trajectory
+- [ ] Rapid TIME sweep for 30 seconds
+- [ ] Rapid DEPTH sweep for 30 seconds
+- [ ] 30 minutes at ENERGY 100%, PULL 100%
 
 ## Defects
+
 | Severity | Setting/source | Reproduction | Observed | Blocking? |
 |---|---|---|---|---|
 | | | | | |
 
 ## Final disposition
+
 - [ ] PASS
 - [ ] PASS WITH NOTES
 - [ ] FAIL
 - [ ] RETEST REQUIRED
+

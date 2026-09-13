@@ -1,12 +1,20 @@
-# ATTRACTOR
+# ATTRACTOR 0.3
 
-ATTRACTOR is a clean-room Human Soon chaotic stereo-motion `modfx` for the original NTS-1 MkI.
+ATTRACTOR is a clean-room VSDC stereo-motion `modfx` for the original NTS-1 MkI.
+
+It models a virtual ball with position, velocity and bounded acceleration. The
+ball drags the full stereo image as it moves and reflects continuously from the
+edges of the field.
 
 | NTS-1 modulation control | ATTRACTOR function |
 |---|---|
-| TIME | **RATE** — slow to fast chaotic trajectory updates |
-| DEPTH | **ORBIT** — center → wide stereo excursion |
+| TIME | **ENERGY** — slow drifting bounces to faster, more aggressive motion |
+| DEPTH | **PULL** — dry stereo at zero to wide image-dragging motion at maximum |
 
-Instead of a periodic LFO, two coupled bounded logistic states create a deterministic non-repeating pan trajectory. The pan target is smoothed so the chaos changes direction without audio-rate clicks.
+The force sequence is deterministic from reset. PULL uses constant-power source
+placement and narrows, but does not collapse, the original stereo width as it
+rises. At 50% the travel is intentionally obvious; at 100% both original stereo
+channels follow the ball without hard left/right switching.
 
-Status: M1 source ready for CI.
+Status: 0.3 source and host-side behavioral tests ready for hardware QA.
+
