@@ -2,14 +2,14 @@ name: Build Full NTS-1 Test Suite
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'oscillators/**/nts1/**'
-      - 'oscillators/**/docs/qa-sheet.md'
-      - 'effects/**/nts1/**'
-      - 'effects/**/docs/qa-sheet.md'
-      - 'TESTING.md'
-      - '.github/workflows/build-full-test-suite.yml'
+
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-full-suite:
@@ -104,3 +104,4 @@ jobs:
           name: human-soon-nts1-test-suite
           path: suite/
           if-no-files-found: error
+          retention-days: 30
