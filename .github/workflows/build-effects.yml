@@ -2,10 +2,24 @@ name: Build NTS-1 Effects
 
 on:
   push:
+    branches: [main]
     paths:
-      - 'effects/**'
+      - 'effects/parallax/**'
+      - 'effects/chordghost/**'
+      - '.github/workflows/build-effects.yml'
+  pull_request:
+    paths:
+      - 'effects/parallax/**'
+      - 'effects/chordghost/**'
       - '.github/workflows/build-effects.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -60,3 +74,4 @@ jobs:
           name: ${{ matrix.effect.name }}-nts1
           path: artifacts/
           if-no-files-found: error
+          retention-days: 30

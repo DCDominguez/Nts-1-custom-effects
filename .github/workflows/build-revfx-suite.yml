@@ -2,6 +2,7 @@ name: Build NTS-1 RevFX Suite
 
 on:
   push:
+    branches: [main]
     paths:
       - 'effects/abyss/**'
       - 'effects/aureole/**'
@@ -14,6 +15,13 @@ on:
       - 'effects/nebula/**'
       - '.github/workflows/build-revfx-suite.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -57,3 +65,4 @@ jobs:
           name: ${{ matrix.name }}-nts1
           path: artifacts/
           if-no-files-found: error
+          retention-days: 30

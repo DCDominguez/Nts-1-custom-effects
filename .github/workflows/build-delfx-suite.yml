@@ -2,6 +2,7 @@ name: Build NTS-1 DelFX Suite
 
 on:
   push:
+    branches: [main]
     paths:
       - 'effects/ballistic/**'
       - 'effects/rainfall/**'
@@ -22,6 +23,13 @@ on:
       - 'effects/shard/**'
       - '.github/workflows/build-delfx-suite.yml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -73,3 +81,4 @@ jobs:
           name: ${{ matrix.name }}-nts1
           path: artifacts/
           if-no-files-found: error
+          retention-days: 30
