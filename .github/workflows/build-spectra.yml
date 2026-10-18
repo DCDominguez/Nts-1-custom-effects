@@ -3,9 +3,21 @@ name: Build SPECTRA
 on:
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'oscillators/spectra/**'
       - '.github/workflows/build-spectra.yml'
+  pull_request:
+    paths:
+      - 'oscillators/spectra/**'
+      - '.github/workflows/build-spectra.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -53,3 +65,4 @@ jobs:
           name: spectra-nts1
           path: artifacts/
           if-no-files-found: error
+          retention-days: 30
